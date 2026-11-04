@@ -53,7 +53,7 @@ export default async function ListingDetailPage({ params }) {
 
           <div className="border-t border-border pt-6">
             {listing.active ? (
-              <NegotiationModePicker dealId={listing.sampleDealId} />
+              <NegotiationModePicker listingId={listing.id} dealId={listing.sampleDealId} />
             ) : (
               <Link
                 href={`/deal/${listing.sampleDealId}`}
@@ -76,18 +76,18 @@ export default async function ListingDetailPage({ params }) {
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">
-                Buyer fee ({FEE_RATE_LABEL}, demo)
+                Platform fee ({FEE_RATE_LABEL})
               </dt>
-              <dd className="font-tabular">{formatCurrency(amounts.fee)}</dd>
+              <dd className="font-tabular">-{formatCurrency(amounts.fee)}</dd>
             </div>
             <div className="flex justify-between border-t border-border pt-2 font-medium">
-              <dt>Buyer would pay</dt>
+              <dt>Buyer pays</dt>
               <dd className="font-tabular">
                 {formatCurrency(amounts.buyerTotal)}
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Seller amount</dt>
+              <dt className="text-muted-foreground">Seller receives</dt>
               <dd className="font-tabular">
                 {formatCurrency(amounts.sellerAmount)}
               </dd>

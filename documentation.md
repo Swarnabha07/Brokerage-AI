@@ -60,7 +60,7 @@ Brokerage AI is a prototype exploring whether an AI agent, combined with PayPal'
 9. The seller marks the item as shipped and provides tracking information.
 10. The buyer confirms the item was received.
 11. A return window begins. For demo purposes this window is a short, visible countdown rather than a multi-day period — this is explicitly a simulation of a real return policy, not a claim that real-world return windows are this short.
-12. When the window closes without a dispute, the platform triggers a PayPal payout to the seller for the agreed amount minus the platform fee.
+12. When the window closes without a dispute, the platform triggers a PayPal payout to the seller for the agreed item price (retaining the 3% platform fee collected at checkout).
 13. Both the buyer and seller dashboards reflect the deal as complete.
 
 ---
@@ -77,7 +77,7 @@ Brokerage AI is a prototype exploring whether an AI agent, combined with PayPal'
 | Real PayPal invoicing | A genuine invoice is created and sent through PayPal's Sandbox Invoicing API, not a custom-built invoice document. |
 | On-site checkout | Payment is captured through PayPal's Orders API embedded directly in the platform's own UI, rather than redirecting the buyer to a PayPal-hosted page. |
 | Held funds, conditional release | Captured funds are not forwarded to the seller immediately. Release is deferred until delivery is confirmed and a return window passes. |
-| Automated payout with fee deduction | The platform calculates and deducts a fee before calling PayPal's Payouts API, so the seller receives the net amount automatically. |
+| Automated payout with platform fee | The platform calculates the 3% platform fee as a separate line item at checkout and dispatches the agreed item price to the seller via PayPal's Payouts API once conditions are met. |
 | Scoped agent permissions | The buyer's AI agent and the seller's AI agent are each given access to a different, limited subset of PayPal's Agent Toolkit tools, matching what that role should be able to do. |
 
 ---
@@ -118,7 +118,7 @@ This project uses PayPal's Sandbox environment and the following APIs, accessed 
 
 PayPal does not provide a dedicated escrow primitive. The "hold funds, then release" behavior in this project is implemented by the platform itself: capturing payment into the platform's own Sandbox business account first, and only calling the Payouts API once the return-window condition is met. This is stated plainly rather than implied, since it is a meaningful distinction from a true third-party escrow service.
 
-The platform fee is calculated in application code (a fixed percentage of the agreed price) and subtracted before the payout call. There is no special PayPal fee-splitting feature in use here.
+The platform fee (3%, configured in `lib/config.js` and `lib/fees.js`) is calculated as a buyer-facing line item during invoice creation and checkout. The buyer pays `agreed_price + platform_fee`, allowing the platform to retain its fee while disbursing the agreed item price to the seller upon return-window close. There is no special PayPal fee-splitting feature in use here.
 
 ---
 
@@ -174,32 +174,60 @@ This split is deliberate, not incidental. Each agent can only take the actions t
 ## 10. Project Structure
 
 ```
-brokerage-ai/
+Brokerage-AI/
 ├── app/
-│   ├── (auth)/
-│   │   ├── login/
-│   │   └── signup/
+│   ├── api/
+│   │   ├── auth/
+│   │   │   ├── login/route.ts
+│   │   │   └── signup/route.ts
+│   │   ├── buyer/dashboard/route.ts
+│   │   ├── deals/
+│   │   │   ├── route.ts
+│   │   │   └── [id]/
+│   │   │       ├── route.ts
+│   │   │       └── messages/route.ts
+│   │   ├── listings/route.ts
+│   │   ├── seed/route.ts
+│   │   └── seller/dashboard/route.ts
 │   ├── buyer/dashboard/
-│   ├── seller/dashboard/
+│   ├── seller/
+│   │   ├── dashboard/
+│   │   └── listings/new/
 │   ├── deal/[id]/
-│   └── api/
-│       ├── negotiate/
-│       ├── invoice/
-│       ├── checkout/
-│       └── payout/
+│   ├── listings/
+│   │   └── [id]/
+│   ├── login/
+│   ├── signup/
+│   ├── globals.css
+│   ├── layout.js
+│   └── page.js
+├── components/
+│   ├── features/
+│   │   ├── auth/
+│   │   ├── dashboard/
+│   │   ├── deal/
+│   │   ├── landing/
+│   │   └── listings/
+│   ├── shared/
+│   └── ui/
 ├── lib/
-│   ├── agents/
-│   │   ├── buyer-agent.ts
-│   │   └── seller-agent.ts
-│   ├── paypal/
-│   └── supabase/
-├── assets/
-│   ├── architecture-overview.png
-│   └── system-layers.png
-├── supabase/
-│   └── schema.sql
+│   ├── api/
+│   │   ├── deals.js
+│   │   └── listings.js
+│   ├── constants/
+│   ├── mock/
+│   ├── config.js
+│   ├── fees.js
+│   ├── format.js
+│   ├── supabase.ts
+│   └── utils.js
+├── types/
+│   └── database.types.ts
 ├── .env.example
+├── .env.local
 ├── LICENSE
+├── package.json
+├── tsconfig.json
 └── README.md
 ```
 

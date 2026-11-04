@@ -22,7 +22,13 @@
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
+*.key
+*.cert
+*.crt
+credentials.json
+service-account*.json
 
 # debug
 npm-debug.log*
@@ -30,8 +36,15 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (strictly ignore actual secret envs, keep example template)
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env*
+!.env.example
 
 # vercel
 .vercel

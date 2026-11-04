@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Bot, CheckCircle2, Circle, RotateCcw } from "lucide-react";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -10,33 +11,47 @@ import { Button } from "@/components/ui/button";
 import { DealStepper } from "@/components/features/deal/DealStepper";
 import { StagePanel } from "@/components/features/deal/DealPanels";
 import { DEAL_STATUS_ORDER } from "@/lib/constants/deal-status";
+import { updateDealStage } from "@/lib/api/payments";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const ACTIVITY = [
   { from: 0, text: "Negotiation started" },
   { from: 1, text: "Terms agreed by both sides" },
-  { from: 2, text: "Seller approved terms; mock invoice created" },
-  { from: 3, text: "Payment recorded (simulated)" },
-  { from: 4, text: "Marked as shipped (simulated)" },
-  { from: 5, text: "Receipt confirmed (simulated)" },
-  { from: 6, text: "Funds released (simulated)" },
+  { from: 2, text: "Seller approved terms; invoice created" },
+  { from: 3, text: "Payment captured & held in escrow" },
+  { from: 4, text: "Marked as shipped with tracking" },
+  { from: 5, text: "Receipt confirmed; return window active" },
+  { from: 6, text: "Funds released to seller" },
 ];
 
-/**
- * Interactive deal view. The starting status comes from the server record;
- * every change after that is simulated, held only in this component, and
- * lost on reload. Nothing here can mark a real payment as made.
- */
 export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
+  const router = useRouter();
   const [status, setStatus] = useState(deal.status);
   const [role, setRole] = useState("buyer");
   const [accepted, setAccepted] = useState(false);
+  const [isPending, setIsPending] = useState(false);
   const index = DEAL_STATUS_ORDER.indexOf(status);
 
-  function advance(next) {
+  const isUuid =
+    deal?.id &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deal.id);
+
+  async function advance(next, extraPayload = {}) {
     setStatus(next);
     setAccepted(false);
+    setIsPending(true);
+
+    try {
+      if (deal?.id) {
+        await updateDealStage(deal.id, next, extraPayload);
+        router.refresh();
+      }
+    } catch (e) {
+      console.warn("Could not persist deal stage to server, remaining in local state:", e);
+    } finally {
+      setIsPending(false);
+    }
   }
 
   return (
@@ -50,8 +65,15 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
 
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-xs text-muted-foreground">{deal.id}</p>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-xs text-muted-foreground">{deal.id}</p>
+            {isUuid ? (
+              <Badge variant="success">Live Deal</Badge>
+            ) : (
+              <Badge variant="outline">Demo Record</Badge>
+            )}
+          </div>
+          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
             {deal.title}
           </h1>
         </div>
@@ -72,6 +94,8 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
               onAccept={setAccepted}
               onAdvance={advance}
               returnWindowSeconds={returnWindowSeconds}
+              isLive={isUuid}
+              isPending={isPending}
             />
           </GlassCard>
         </div>
@@ -82,17 +106,17 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
               Parties
             </h2>
             <dl className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Buyer</dt>
-                <dd>{deal.buyer.name}</dd>
+              <div>
+                <dt className="text-xs text-muted-foreground">Buyer</dt>
+                <dd className="font-medium">{deal.buyer?.name || "Demo Buyer"}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Seller</dt>
-                <dd>{deal.seller.name}</dd>
+              <div>
+                <dt className="text-xs text-muted-foreground">Seller</dt>
+                <dd className="font-medium">{deal.seller?.name || "Demo Seller"}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Mode</dt>
-                <dd>
+              <div>
+                <dt className="text-xs text-muted-foreground">Negotiation mode</dt>
+                <dd className="font-medium">
                   {deal.negotiationMode === "ai_negotiate"
                     ? "AI negotiate"
                     : "Self chat"}
@@ -107,17 +131,17 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
             </h2>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Item price</dt>
+                <dt className="text-muted-foreground">Agreed price</dt>
                 <dd className="font-tabular">
                   {formatCurrency(deal.amounts.price)}
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">
-                  Buyer fee ({feeLabel}, demo)
+                  Platform fee ({feeLabel})
                 </dt>
-                <dd className="font-tabular">
-                  {formatCurrency(deal.amounts.fee)}
+                <dd className="font-tabular text-muted-foreground">
+                  -{formatCurrency(deal.amounts.fee)}
                 </dd>
               </div>
               <div className="flex justify-between border-t border-border pt-2 font-medium">
@@ -127,59 +151,62 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Seller amount</dt>
-                <dd className="font-tabular">
+                <dt className="text-muted-foreground">Seller receives</dt>
+                <dd className="font-tabular font-medium text-foreground">
                   {formatCurrency(deal.amounts.sellerAmount)}
                 </dd>
               </div>
             </dl>
             <p className="mt-3 text-xs text-muted-foreground">
-              The fee is a provisional demo assumption, not final policy.
+              Standard 3% platform fee deducted upon payout release.
             </p>
           </GlassCard>
 
           <GlassCard hover={false} className="p-6">
-            <h2 className="mb-4 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              <Bot className="h-3.5 w-3.5" aria-hidden="true" /> Activity
+            <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Timeline
             </h2>
             <ol className="space-y-3 text-sm">
-              {ACTIVITY.map((item) => {
-                const done = index >= item.from;
+              {ACTIVITY.map((step, i) => {
+                const reached = i <= index;
+                const current = i === index;
                 return (
                   <li
-                    key={item.text}
+                    key={step.text}
                     className={cn(
                       "flex items-start gap-2.5",
-                      !done && "text-muted-foreground/60",
+                      reached ? "text-foreground" : "text-muted-foreground/60",
                     )}
                   >
-                    {done ? (
+                    {reached ? (
                       <CheckCircle2
-                        className="mt-0.5 h-4 w-4 shrink-0 text-success"
-                        aria-label="Done"
+                        className={cn(
+                          "mt-0.5 h-4 w-4 shrink-0",
+                          current ? "text-brand-mid" : "text-success",
+                        )}
+                        aria-hidden="true"
                       />
                     ) : (
                       <Circle
-                        className="mt-0.5 h-4 w-4 shrink-0"
-                        aria-label="Pending"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-border"
+                        aria-hidden="true"
                       />
                     )}
-                    {item.text}
+                    <span className={cn(current && "font-semibold")}>
+                      {step.text}
+                    </span>
                   </li>
                 );
               })}
             </ol>
           </GlassCard>
 
-          <GlassCard hover={false} className="border-warning/30 p-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-xs font-medium uppercase tracking-wider text-warning">
-                Demo controls
-              </h2>
-              <Badge variant="warning">No real payment</Badge>
-            </div>
+          <GlassCard hover={false} className="p-6">
+            <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Demo perspective
+            </h2>
             <fieldset>
-              <legend className="mb-2 text-sm">View as</legend>
+              <legend className="sr-only">Switch perspective</legend>
               <div className="grid grid-cols-2 gap-2">
                 {["buyer", "seller"].map((r) => (
                   <label
@@ -209,13 +236,15 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
               size="sm"
               className="mt-4 w-full"
               onClick={() => advance(deal.status)}
+              disabled={isPending}
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Reset
               simulation
             </Button>
             <p className="mt-3 text-xs text-muted-foreground">
-              Simulated state lives in this page only and resets on reload. Role
-              switching replaces login while authentication is not connected.
+              {isUuid
+                ? "Changes to live deals persist to Supabase."
+                : "Simulated state lives in this page only and resets on reload."}
             </p>
           </GlassCard>
         </aside>

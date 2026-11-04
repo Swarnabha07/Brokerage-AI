@@ -90,7 +90,7 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 >
 > 📦 The seller ships, the buyer confirms, a **return window** runs
 >
-> 💸 When it closes, **PayPal Payouts** automatically releases the funds to the seller — minus a small platform fee
+> 💸 When it closes, **PayPal Payouts** releases the agreed funds to the seller, with the transparent 3% platform fee retained by the platform
 
 <br>
 
@@ -188,7 +188,7 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 <tr>
 <td align="center">💸</td>
 <td><b>Automated Payouts</b></td>
-<td>PayPal Payouts API releases funds to the seller automatically, minus a transparent platform fee</td>
+<td>PayPal Payouts API releases the agreed funds to the seller automatically, with a transparent 3% platform fee</td>
 </tr>
 <tr>
 <td align="center">📊</td>

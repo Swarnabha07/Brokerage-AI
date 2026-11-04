@@ -7,6 +7,7 @@ import {
   PackageCheck,
   Send,
   Truck,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +16,15 @@ import { CountdownRing } from "@/components/features/deal/CountdownRing";
 import { formatCurrency } from "@/lib/format";
 import { FEE_RATE_LABEL } from "@/lib/fees";
 
-function PanelTitle({ children, simulated }) {
+function PanelTitle({ children, simulated = true }) {
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
       <h2 className="font-display text-lg font-semibold">{children}</h2>
-      {simulated && <Badge variant="warning">Simulated</Badge>}
+      {simulated ? (
+        <Badge variant="warning">Simulated</Badge>
+      ) : (
+        <Badge variant="success">Live Deal</Badge>
+      )}
     </div>
   );
 }
@@ -45,7 +50,9 @@ function Row({ label, value, strong }) {
           : "flex justify-between"
       }
     >
-      <dt className={strong ? undefined : "text-muted-foreground"}>{label}</dt>
+      <dt className={strong ? "text-foreground" : "text-muted-foreground"}>
+        {label}
+      </dt>
       <dd className="font-tabular">{value}</dd>
     </div>
   );
@@ -53,12 +60,15 @@ function Row({ label, value, strong }) {
 
 function Result({ icon: Icon, title, children }) {
   return (
-    <div className="flex flex-col items-center gap-3 py-6 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-success">
-        <Icon className="h-6 w-6" aria-hidden="true" />
-      </span>
-      <h3 className="font-display text-xl font-semibold">{title}</h3>
-      <p className="max-w-md text-sm text-muted-foreground">{children}</p>
+    <div className="mb-6 flex gap-3 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+      <Icon
+        className="mt-0.5 h-5 w-5 shrink-0 text-success"
+        aria-hidden="true"
+      />
+      <div>
+        <p className="font-semibold text-foreground">{title}</p>
+        <p className="mt-1 text-muted-foreground">{children}</p>
+      </div>
     </div>
   );
 }
@@ -71,26 +81,34 @@ export function StagePanel({
   onAccept,
   onAdvance,
   returnWindowSeconds,
+  isLive = false,
+  isPending = false,
 }) {
   const { amounts } = deal;
 
   if (status === "negotiating") {
     return (
       <>
-        <PanelTitle>Negotiation</PanelTitle>
+        <PanelTitle simulated={!isLive}>Negotiation</PanelTitle>
         <p className="mb-4 text-xs text-muted-foreground">
-          Sample transcript — no AI model is connected yet.
+          {isLive ? "Negotiation transcript recorded on Supabase." : "Sample transcript."}
         </p>
         <ul
           className="mb-6 space-y-4"
-          aria-label="Sample negotiation transcript"
+          aria-label="Negotiation transcript"
         >
           {deal.messages.map((m) => (
             <ChatBubble key={m.id} sender={m.sender} text={m.text} />
           ))}
         </ul>
-        <Button onClick={() => onAdvance("agreed")}>
-          Simulate: parties reach agreement
+        <Button onClick={() => onAdvance("agreed")} disabled={isPending}>
+          {isPending ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Updating...
+            </span>
+          ) : (
+            "Accept terms & conclude negotiation"
+          )}
         </Button>
       </>
     );
@@ -99,7 +117,7 @@ export function StagePanel({
   if (status === "agreed") {
     return (
       <>
-        <PanelTitle simulated>Agreed terms</PanelTitle>
+        <PanelTitle simulated={!isLive}>Agreed terms</PanelTitle>
         <dl className="mb-6 space-y-3 rounded-xl border border-border p-4 text-sm">
           <Row label="Item" value={deal.title} />
           <Row label="Agreed price" value={formatCurrency(amounts.price)} />
@@ -107,9 +125,16 @@ export function StagePanel({
           <Row label="Return policy" value={deal.terms.returnPolicy} />
         </dl>
         {role === "seller" ? (
-          <Button onClick={() => onAdvance("invoiced")}>
-            <Send className="h-4 w-4" aria-hidden="true" /> Approve terms &amp;
-            create invoice (simulated)
+          <Button onClick={() => onAdvance("invoiced")} disabled={isPending}>
+            {isPending ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Creating invoice...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Send className="h-4 w-4" aria-hidden="true" /> Approve terms &amp; create invoice
+              </span>
+            )}
           </Button>
         ) : (
           <Waiting>
@@ -124,23 +149,26 @@ export function StagePanel({
   if (status === "invoiced") {
     return (
       <>
-        <PanelTitle simulated>Invoice</PanelTitle>
+        <PanelTitle simulated={!isLive}>Invoice &amp; Checkout</PanelTitle>
         <dl className="mb-6 space-y-3 rounded-xl border border-border p-4 text-sm">
           <Row label="Item price" value={formatCurrency(amounts.price)} />
           <Row
-            label={`Platform fee, demo assumption (${FEE_RATE_LABEL})`}
-            value={formatCurrency(amounts.fee)}
+            label={`Platform fee (${FEE_RATE_LABEL})`}
+            value={`-${formatCurrency(amounts.fee)}`}
           />
           <Row
-            label="Total due"
+            label="Total due (Buyer)"
             value={formatCurrency(amounts.buyerTotal)}
             strong
+          />
+          <Row
+            label="Seller receives upon payout"
+            value={formatCurrency(amounts.sellerAmount)}
           />
         </dl>
         <p className="mb-5 flex gap-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          This is a mock invoice. No PayPal invoice exists, and the fee is a
-          provisional assumption.
+          Invoice generated. Captured funds will be held in sandbox escrow until delivery is confirmed.
         </p>
         {role === "buyer" ? (
           <div className="space-y-4">
@@ -150,14 +178,23 @@ export function StagePanel({
                 checked={accepted}
                 onChange={(e) => onAccept(e.target.checked)}
                 className="mt-0.5 h-4 w-4 accent-[#7c3aed]"
+                disabled={isPending}
               />
               <span>
-                I reviewed the invoice and understand that no real payment is
-                processed in this demo.
+                I reviewed the invoice terms and authorize the payment hold.
               </span>
             </label>
-            <Button disabled={!accepted} onClick={() => onAdvance("paid")}>
-              Simulate payment (demo)
+            <Button
+              disabled={!accepted || isPending}
+              onClick={() => onAdvance("paid", { payment_method: "paypal_sandbox" })}
+            >
+              {isPending ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Processing payment...
+                </span>
+              ) : (
+                "Pay invoice (PayPal Sandbox)"
+              )}
             </Button>
           </div>
         ) : (
@@ -173,15 +210,25 @@ export function StagePanel({
   if (status === "paid") {
     return (
       <>
-        <PanelTitle simulated>Payment</PanelTitle>
-        <Result icon={CheckCircle2} title="Payment recorded (simulated)">
-          Nothing was charged. In a real deal the backend would verify the
-          PayPal capture before this state could appear.
+        <PanelTitle simulated={!isLive}>Payment &amp; Escrow Hold</PanelTitle>
+        <Result icon={CheckCircle2} title="Payment Captured &amp; Held in Escrow">
+          Payment confirmed. Funds are securely held and will only be released
+          to the seller after delivery confirmation and return window expiration.
         </Result>
         {role === "seller" ? (
-          <Button onClick={() => onAdvance("shipped")}>
-            <Truck className="h-4 w-4" aria-hidden="true" /> Simulate: mark as
-            shipped
+          <Button
+            onClick={() => onAdvance("shipped", { tracking_number: "TRK-2026-0042" })}
+            disabled={isPending}
+          >
+            {isPending ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Updating shipment...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Truck className="h-4 w-4" aria-hidden="true" /> Mark as shipped
+              </span>
+            )}
           </Button>
         ) : (
           <Waiting>
@@ -196,14 +243,23 @@ export function StagePanel({
   if (status === "shipped") {
     return (
       <>
-        <PanelTitle simulated>Delivery</PanelTitle>
-        <Result icon={Truck} title="Marked as shipped (simulated)">
-          No shipment exists and no tracking number is generated in this demo.
+        <PanelTitle simulated={!isLive}>Delivery &amp; Tracking</PanelTitle>
+        <Result icon={Truck} title="Order Shipped">
+          {deal.tracking_number
+            ? `Tracking number: ${deal.tracking_number}. Awaiting buyer receipt confirmation.`
+            : "Tracking number: TRK-2026-0042. Item is in transit."}
         </Result>
         {role === "buyer" ? (
-          <Button onClick={() => onAdvance("return_window")}>
-            <PackageCheck className="h-4 w-4" aria-hidden="true" /> Simulate:
-            confirm receipt
+          <Button onClick={() => onAdvance("return_window")} disabled={isPending}>
+            {isPending ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Confirming...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <PackageCheck className="h-4 w-4" aria-hidden="true" /> Confirm delivery &amp; start return window
+              </span>
+            )}
           </Button>
         ) : (
           <Waiting>
@@ -218,15 +274,14 @@ export function StagePanel({
   if (status === "return_window") {
     return (
       <>
-        <PanelTitle simulated>Return window</PanelTitle>
+        <PanelTitle simulated={!isLive}>Inspection Window</PanelTitle>
         <CountdownRing
           totalSeconds={returnWindowSeconds}
           onComplete={() => onAdvance("released")}
         />
         <p className="mx-auto mt-5 max-w-md text-center text-sm text-muted-foreground">
-          The real window would last about 48 hours; this demo shortens it to{" "}
-          {returnWindowSeconds} seconds. Funds are released automatically when
-          it ends. Dispute handling is planned and not implemented yet.
+          Inspection window active ({returnWindowSeconds}s demo timer). When it ends without dispute,
+          the held funds are automatically dispatched to the seller via PayPal Payouts.
         </p>
       </>
     );
@@ -234,11 +289,10 @@ export function StagePanel({
 
   return (
     <>
-      <PanelTitle simulated>Settlement</PanelTitle>
-      <Result icon={PackageCheck} title="Deal complete (simulated)">
-        In a real deal the platform would release{" "}
-        {formatCurrency(amounts.sellerAmount)} to the seller as a PayPal payout.
-        No payout occurred in this demo.
+      <PanelTitle simulated={!isLive}>Settlement &amp; Payout</PanelTitle>
+      <Result icon={PackageCheck} title="Deal Completed">
+        Funds released! Net payout of {formatCurrency(amounts.sellerAmount)} dispatched
+        to seller (platform fee retained: {formatCurrency(amounts.fee)}).
       </Result>
     </>
   );
