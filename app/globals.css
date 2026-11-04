@@ -1,26 +1,114 @@
 @import "tailwindcss";
 
+/*
+  Brokerage AI design tokens (Tailwind v4, CSS-first).
+  The app is dark-only on purpose: the reference prototype never used light mode.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  --background: #08080d;
+  --foreground: #f5f5f5;
+  --surface: #10101a;
+  --surface-foreground: #f5f5f5;
+  --muted: #181826;
+  --muted-foreground: #9d9db3;
+  --border: #23233a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-brand: #6d4fe5;
+  --color-brand-start: #4f46e5;
+  --color-brand-mid: #7c3aed;
+  --color-brand-end: #0070ba;
+
+  --color-success: #10b981;
+  --color-success-soft: rgb(16 185 129 / 0.14);
+  --color-warning: #f59e0b;
+  --color-warning-soft: rgb(245 158 11 / 0.14);
+  --color-danger: #f43f5e;
+  --color-danger-soft: rgb(244 63 94 / 0.14);
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+
+  --animate-float-slow: float-slow 7s ease-in-out infinite;
+
+  @keyframes float-slow {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-14px) rotate(4deg);
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@utility bg-brand-gradient {
+  background-image: linear-gradient(
+    135deg,
+    #4f46e5 0%,
+    #7c3aed 50%,
+    #0070ba 100%
+  );
+}
+
+@utility bg-mesh {
+  background-image:
+    radial-gradient(at 20% 20%, rgb(79 70 229 / 0.25) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgb(124 58 237 / 0.2) 0px, transparent 50%),
+    radial-gradient(at 80% 80%, rgb(0 112 186 / 0.2) 0px, transparent 50%);
+}
+
+@utility glass {
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+@utility text-gradient {
+  background-image: linear-gradient(135deg, #4f46e5, #7c3aed, #0070ba);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility scrollbar-thin {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+  }
 }
