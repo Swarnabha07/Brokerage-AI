@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       console.warn('Warning: Failed to upsert public.users row:', upsertError.message);
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         user: authData.user,
         session: authData.session,
@@ -68,6 +68,20 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      path: '/',
+      sameSite: 'lax' as const,
+      maxAge: 60 * 60 * 24 * 7,
+      secure: isProduction,
+      httpOnly: true,
+    };
+
+    response.cookies.set('escrowmate_user_id', authData.user.id, cookieOptions);
+    response.cookies.set('escrowmate_user_role', role, cookieOptions);
+
+    return response;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error during signup';
     return NextResponse.json({ error: message }, { status: 500 });

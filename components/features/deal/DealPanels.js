@@ -272,15 +272,21 @@ export function StagePanel({
   }
 
   if (status === "return_window") {
+    const startedAt =
+      deal?.terms?.return_window_started_at ||
+      deal?.terms_json?.return_window_started_at ||
+      null;
+
     return (
       <>
         <PanelTitle simulated={!isLive}>Inspection Window</PanelTitle>
         <CountdownRing
-          totalSeconds={returnWindowSeconds}
+          totalSeconds={returnWindowSeconds || 60}
+          startedAt={startedAt}
           onComplete={() => onAdvance("released")}
         />
         <p className="mx-auto mt-5 max-w-md text-center text-sm text-muted-foreground">
-          Inspection window active ({returnWindowSeconds}s demo timer). When it ends without dispute,
+          Inspection window active ({returnWindowSeconds || 60}s demo timer, clearly labeled as simulating a real return period). When it ends without dispute,
           the held funds are automatically dispatched to the seller via PayPal Payouts.
         </p>
       </>

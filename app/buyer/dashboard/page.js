@@ -8,13 +8,16 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { buttonVariants } from "@/components/ui/button";
 import { getBuyerDashboard } from "@/lib/api/deals";
+import { getActiveUserSession } from "@/lib/auth/session";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { FEE_RATE_LABEL } from "@/lib/fees";
 
 export const metadata = { title: "Buyer dashboard" };
 
 export default async function BuyerDashboardPage() {
-  const { viewer, stats, activeDeals, history } = await getBuyerDashboard();
+  const user = await getActiveUserSession();
+  const buyerId = user?.id || "22222222-2222-2222-2222-222222222222";
+  const { viewer, stats, activeDeals, history } = await getBuyerDashboard(buyerId);
 
   const columns = [
     { key: "title", header: "Item" },
@@ -39,7 +42,7 @@ export default async function BuyerDashboardPage() {
         title="Buyer dashboard"
         description={
           <>
-            Sample data for {viewer.name}.{" "}
+            {user ? `Active account: ${viewer.name}. ` : `Sample data for ${viewer.name}. `}
             <Link
               href="/seller/dashboard"
               className="underline underline-offset-4 hover:text-foreground"

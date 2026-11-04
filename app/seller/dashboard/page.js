@@ -10,13 +10,16 @@ import { GlassCard } from "@/components/shared/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { getSellerDashboard } from "@/lib/api/deals";
+import { getActiveUserSession } from "@/lib/auth/session";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export const metadata = { title: "Seller dashboard" };
 
 export default async function SellerDashboardPage() {
+  const user = await getActiveUserSession();
+  const sellerId = user?.id || "11111111-1111-1111-1111-111111111111";
   const { viewer, stats, listings, activeDeals, payouts } =
-    await getSellerDashboard();
+    await getSellerDashboard(sellerId);
 
   const columns = [
     { key: "title", header: "Item" },
@@ -49,7 +52,7 @@ export default async function SellerDashboardPage() {
         title="Seller dashboard"
         description={
           <>
-            Sample data for {viewer.name}.{" "}
+            {user ? `Active account: ${viewer.name}. ` : `Sample data for ${viewer.name}. `}
             <Link
               href="/buyer/dashboard"
               className="underline underline-offset-4 hover:text-foreground"

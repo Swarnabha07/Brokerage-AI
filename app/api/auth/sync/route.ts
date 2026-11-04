@@ -37,7 +37,21 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, role: requestedRole });
+    const response = NextResponse.json({ ok: true, role: requestedRole });
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      path: '/',
+      sameSite: 'lax' as const,
+      maxAge: 60 * 60 * 24 * 7,
+      secure: isProduction,
+      httpOnly: true,
+    };
+
+    response.cookies.set('escrowmate_user_id', userId, cookieOptions);
+    response.cookies.set('escrowmate_user_role', requestedRole, cookieOptions);
+
+    return response;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Sync failed';
     return NextResponse.json({ error: message }, { status: 500 });
