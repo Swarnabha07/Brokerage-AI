@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       role = dbUser.role;
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         session: authData.session,
         user: authData.user,
@@ -56,6 +56,20 @@ export async function POST(request: Request) {
       },
       { status: 200 }
     );
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      path: '/',
+      sameSite: 'lax' as const,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      secure: isProduction,
+      httpOnly: true,
+    };
+
+    response.cookies.set('escrowmate_user_id', authData.user.id, cookieOptions);
+    response.cookies.set('escrowmate_user_role', role, cookieOptions);
+
+    return response;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error during login';
     return NextResponse.json({ error: message }, { status: 500 });

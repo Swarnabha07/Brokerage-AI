@@ -9,6 +9,7 @@ import { Field, Input } from "@/components/ui/field";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { cn } from "@/lib/utils";
 import { signInWithGoogle } from "@/lib/auth/session";
+import { supabase } from "@/lib/supabase";
 
 function GoogleIcon(props) {
   return (
@@ -106,6 +107,18 @@ export function AuthForm({ mode, initialError = "" }) {
         return;
       }
 
+      // Persist Supabase session in the browser client
+      if (data.session?.access_token && data.session?.refresh_token) {
+        try {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+        } catch (sessionErr) {
+          console.warn("Could not set browser Supabase session:", sessionErr);
+        }
+      }
+
       setSuccessMsg(
         isSignup
           ? "Account created successfully! Redirecting to dashboard..."
@@ -114,11 +127,9 @@ export function AuthForm({ mode, initialError = "" }) {
 
       const targetRole = data.role || values.role;
       setTimeout(() => {
-        if (targetRole === "seller") {
-          router.push("/seller/dashboard");
-        } else {
-          router.push("/buyer/dashboard");
-        }
+        const destination = targetRole === "seller" ? "/seller/dashboard" : "/buyer/dashboard";
+        router.push(destination);
+        router.refresh();
       }, 800);
     } catch {
       setServerError("Network error or server unavailable. Redirecting in demo mode...");

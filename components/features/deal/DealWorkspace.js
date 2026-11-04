@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Bot, CheckCircle2, Circle, RotateCcw } from "lucide-react";
@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button";
 import { DealStepper } from "@/components/features/deal/DealStepper";
 import { StagePanel } from "@/components/features/deal/DealPanels";
 import { DEAL_STATUS_ORDER } from "@/lib/constants/deal-status";
-import { updateDealStage } from "@/lib/api/payments";
+import { updateDealStage, confirmReceived } from "@/lib/api/payments";
+import { getDealAmounts } from "@/lib/fees";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 const ACTIVITY = [
   { from: 0, text: "Negotiation started" },
@@ -25,8 +27,9 @@ const ACTIVITY = [
   { from: 6, text: "Funds released to seller" },
 ];
 
-export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
+export function DealWorkspace({ deal, returnWindowSeconds = 60, feeLabel = "3%" }) {
   const router = useRouter();
+  const [currentDeal, setCurrentDeal] = useState(deal);
   const [status, setStatus] = useState(deal.status);
   const [role, setRole] = useState("buyer");
   const [accepted, setAccepted] = useState(false);
@@ -37,6 +40,92 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
     deal?.id &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deal.id);
 
+  // Sync if parent passes updated deal
+  useEffect(() => {
+    setCurrentDeal(deal);
+    setStatus(deal.status);
+  }, [deal]);
+
+  // Subscribe to Supabase Realtime channel for live updates
+  useEffect(() => {
+    if (!isUuid || !deal?.id) return;
+
+    const channel = supabase
+      .channel(`deal-room-${deal.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "deals",
+          filter: `id=eq.${deal.id}`,
+        },
+        (payload) => {
+          if (payload.new) {
+            const updated = payload.new;
+            if (updated.status) {
+              setStatus(updated.status);
+            }
+            setCurrentDeal((prev) => {
+              const newPrice = Number(updated.agreed_price ?? prev.price);
+              const newTerms =
+                typeof updated.terms_json === "object" && updated.terms_json !== null
+                  ? { ...prev.terms, ...updated.terms_json }
+                  : prev.terms;
+
+              return {
+                ...prev,
+                status: updated.status || prev.status,
+                price: newPrice,
+                amounts: getDealAmounts(newPrice),
+                tracking_number: updated.tracking_number ?? prev.tracking_number,
+                terms: newTerms,
+                terms_json: updated.terms_json ?? prev.terms_json,
+              };
+            });
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `deal_id=eq.${deal.id}`,
+        },
+        (payload) => {
+          if (payload.new) {
+            const newMsg = payload.new;
+            setCurrentDeal((prev) => {
+              const existing = prev.messages || [];
+              if (existing.some((m) => m.id === newMsg.id)) {
+                return prev;
+              }
+              return {
+                ...prev,
+                messages: [
+                  ...existing,
+                  {
+                    id: newMsg.id,
+                    sender: newMsg.sender,
+                    text: newMsg.text,
+                    isAiGenerated: newMsg.is_ai_generated ?? false,
+                    timestamp: newMsg.created_at || "",
+                  },
+                ],
+              };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [deal.id, isUuid]);
+
   async function advance(next, extraPayload = {}) {
     setStatus(next);
     setAccepted(false);
@@ -44,7 +133,11 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
 
     try {
       if (deal?.id) {
-        await updateDealStage(deal.id, next, extraPayload);
+        if (next === "return_window") {
+          await confirmReceived(deal.id);
+        } else {
+          await updateDealStage(deal.id, next, extraPayload);
+        }
         router.refresh();
       }
     } catch (e) {
@@ -66,7 +159,7 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <p className="font-mono text-xs text-muted-foreground">{deal.id}</p>
+            <p className="font-mono text-xs text-muted-foreground">{currentDeal.id}</p>
             {isUuid ? (
               <Badge variant="success">Live Deal</Badge>
             ) : (
@@ -74,7 +167,7 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
             )}
           </div>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
-            {deal.title}
+            {currentDeal.title}
           </h1>
         </div>
         <StatusBadge status={status} />
@@ -89,7 +182,7 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
             <StagePanel
               status={status}
               role={role}
-              deal={deal}
+              deal={currentDeal}
               accepted={accepted}
               onAccept={setAccepted}
               onAdvance={advance}
@@ -108,16 +201,16 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
             <dl className="space-y-3 text-sm">
               <div>
                 <dt className="text-xs text-muted-foreground">Buyer</dt>
-                <dd className="font-medium">{deal.buyer?.name || "Demo Buyer"}</dd>
+                <dd className="font-medium">{currentDeal.buyer?.name || "Demo Buyer"}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Seller</dt>
-                <dd className="font-medium">{deal.seller?.name || "Demo Seller"}</dd>
+                <dd className="font-medium">{currentDeal.seller?.name || "Demo Seller"}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Negotiation mode</dt>
                 <dd className="font-medium">
-                  {deal.negotiationMode === "ai_negotiate"
+                  {currentDeal.negotiationMode === "ai_negotiate"
                     ? "AI negotiate"
                     : "Self chat"}
                 </dd>
@@ -133,7 +226,7 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Agreed price</dt>
                 <dd className="font-tabular">
-                  {formatCurrency(deal.amounts.price)}
+                  {formatCurrency(currentDeal.amounts.price)}
                 </dd>
               </div>
               <div className="flex justify-between">
@@ -141,19 +234,19 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
                   Platform fee ({feeLabel})
                 </dt>
                 <dd className="font-tabular text-muted-foreground">
-                  -{formatCurrency(deal.amounts.fee)}
+                  -{formatCurrency(currentDeal.amounts.fee)}
                 </dd>
               </div>
               <div className="flex justify-between border-t border-border pt-2 font-medium">
                 <dt>Buyer pays</dt>
                 <dd className="font-tabular">
-                  {formatCurrency(deal.amounts.buyerTotal)}
+                  {formatCurrency(currentDeal.amounts.buyerTotal)}
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Seller receives</dt>
                 <dd className="font-tabular font-medium text-foreground">
-                  {formatCurrency(deal.amounts.sellerAmount)}
+                  {formatCurrency(currentDeal.amounts.sellerAmount)}
                 </dd>
               </div>
             </dl>
@@ -235,7 +328,7 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
               variant="outline"
               size="sm"
               className="mt-4 w-full"
-              onClick={() => advance(deal.status)}
+              onClick={() => advance(currentDeal.status)}
               disabled={isPending}
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Reset
@@ -243,7 +336,7 @@ export function DealWorkspace({ deal, returnWindowSeconds, feeLabel }) {
             </Button>
             <p className="mt-3 text-xs text-muted-foreground">
               {isUuid
-                ? "Changes to live deals persist to Supabase."
+                ? "Changes to live deals persist to Supabase in real time."
                 : "Simulated state lives in this page only and resets on reload."}
             </p>
           </GlassCard>
