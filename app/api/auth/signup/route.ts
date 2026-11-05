@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { ensureUserProfile } from '@/lib/auth/server';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+
+// Keeps automated mass-account-creation scripts from hammering this route.
+const SIGNUP_LIMIT = 10;
+const SIGNUP_WINDOW_MS = 60 * 60 * 1000; // 10 signups / hour / IP
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -12,6 +17,15 @@ const signupSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const ipCheck = checkRateLimit(`signup:ip:${ip}`, SIGNUP_LIMIT, SIGNUP_WINDOW_MS);
+    if (!ipCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Too many signup attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(ipCheck.retryAfterSeconds) } },
+      );
+    }
+
     const parsed = signupSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid input data' }, { status: 400 });
