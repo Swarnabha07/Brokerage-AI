@@ -35,7 +35,7 @@ export default async function ListingDetailPage({ params }) {
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <GlassCard hover={false} className="space-y-5 p-8">
           <div className="flex flex-wrap gap-2">
-            <Badge>Sample listing</Badge>
+            <Badge>{listing.sampleDealId ? "Sample listing" : "Live listing"}</Badge>
             {!listing.active && (
               <Badge variant="warning">Sold in sample data</Badge>
             )}
@@ -78,7 +78,7 @@ export default async function ListingDetailPage({ params }) {
               <dt className="text-muted-foreground">
                 Platform fee ({FEE_RATE_LABEL})
               </dt>
-              <dd className="font-tabular">-{formatCurrency(amounts.fee)}</dd>
+              <dd className="font-tabular">+{formatCurrency(amounts.fee)}</dd>
             </div>
             <div className="flex justify-between border-t border-border pt-2 font-medium">
               <dt>Buyer pays</dt>

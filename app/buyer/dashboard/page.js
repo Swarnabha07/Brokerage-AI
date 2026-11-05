@@ -8,23 +8,25 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { buttonVariants } from "@/components/ui/button";
 import { getBuyerDashboard } from "@/lib/api/deals";
-import { getActiveUserSession } from "@/lib/auth/session";
+import { redirect } from "next/navigation";
+import { getVerifiedUser } from "@/lib/auth/server";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { FEE_RATE_LABEL } from "@/lib/fees";
 
 export const metadata = { title: "Buyer dashboard" };
 
 export default async function BuyerDashboardPage() {
-  const user = await getActiveUserSession();
-  const buyerId = user?.id || "22222222-2222-2222-2222-222222222222";
-  const { viewer, stats, activeDeals, history } = await getBuyerDashboard(buyerId);
+  const user = await getVerifiedUser();
+  if (!user) redirect("/login");
+  if (user.role !== "buyer") redirect("/seller/dashboard");
+  const { viewer, stats, activeDeals, history } = await getBuyerDashboard(user);
 
   const columns = [
     { key: "title", header: "Item" },
     { key: "date", header: "Date", render: (r) => formatDate(r.date) },
     {
       key: "fee",
-      header: `Platform fee (${FEE_RATE_LABEL}, demo)`,
+      header: `Platform fee (${FEE_RATE_LABEL}, provisional)`,
       align: "right",
       render: (r) => formatCurrency(r.amounts.fee),
     },
@@ -42,13 +44,8 @@ export default async function BuyerDashboardPage() {
         title="Buyer dashboard"
         description={
           <>
-            {user ? `Active account: ${viewer.name}. ` : `Sample data for ${viewer.name}. `}
-            <Link
-              href="/seller/dashboard"
-              className="underline underline-offset-4 hover:text-foreground"
-            >
-              Switch to the seller view
-            </Link>
+            {`Signed in as ${viewer.name}. `}
+
           </>
         }
         action={
@@ -90,7 +87,7 @@ export default async function BuyerDashboardPage() {
           <GlassCard hover={false}>
             <EmptyState
               title="No active deals"
-              description="Browse listings to start a sample deal."
+              description="Browse listings to start a deal."
             />
           </GlassCard>
         ) : (
@@ -112,7 +109,7 @@ export default async function BuyerDashboardPage() {
           Order history
         </h2>
         <TransactionsTable
-          caption="Completed sample orders"
+          caption="Completed orders"
           columns={columns}
           rows={history}
           emptyTitle="No completed orders yet"

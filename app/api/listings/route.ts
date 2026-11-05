@@ -1,109 +1,80 @@
-import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { supabaseAdmin } from '@/lib/supabase';
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireUser, errorResponse } from "@/lib/auth/server";
 
-const DEMO_SELLER_ID = '11111111-1111-1111-1111-111111111111';
+const createListingSchema = z
+  .object({
+    title: z.string().trim().min(1, "Title is required").max(200),
+    description: z.string().trim().max(5000).optional().nullable(),
+    price: z.number().positive("Price must be greater than 0").max(100000),
+    floor_price: z
+      .number()
+      .nonnegative("Floor price cannot be negative")
+      .optional()
+      .nullable(),
+  })
+  .strict();
 
-const createListingSchema = z.object({
-  seller_id: z.string().uuid().optional(),
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional().nullable(),
-  price: z.number().positive('Price must be greater than 0'),
-  floor_price: z.number().nonnegative('Floor price cannot be negative').optional().nullable(),
-});
-
+// Public browse list. floor_price is private to the seller and never selected here.
 export async function GET() {
   try {
-    const { data: listings, error } = await supabaseAdmin
-      .from('listings')
-      .select(`
-        *,
-        seller:users!seller_id (
-          id,
-          email,
-          role
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching listings:', error);
+    const { data, error } = await supabaseAdmin
+      .from("listings")
+      .select(
+        "id, seller_id, title, description, price, created_at, seller:users!seller_id(id, email)",
+      )
+      .order("created_at", { ascending: false });
+    if (error)
       return NextResponse.json(
-        { error: `Failed to fetch listings: ${error.message}` },
-        { status: 500 }
+        { error: "Failed to fetch listings" },
+        { status: 500 },
       );
-    }
-
-    return NextResponse.json(listings || []);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(data ?? []);
+  } catch (err) {
+    return errorResponse(err);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const parsed = createListingSchema.safeParse(body);
-
+    const user = await requireUser("seller");
+    const parsed = createListingSchema.safeParse(
+      await request.json().catch(() => null),
+    );
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid listing data' },
-        { status: 400 }
+        { error: parsed.error.issues[0]?.message || "Invalid listing data" },
+        { status: 400 },
       );
     }
-
-    const { seller_id, title, description, price, floor_price } = parsed.data;
-
-    // Use provided seller_id or default to demo seller
-    const sellerId = seller_id || DEMO_SELLER_ID;
-
-    // Verify seller exists
-    const { data: sellerUser, error: sellerCheckError } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('id', sellerId)
-      .maybeSingle();
-
-    if (!sellerUser && !sellerCheckError) {
-      // Auto-insert demo seller if missing
-      await supabaseAdmin.from('users').upsert({
-        id: sellerId,
-        email: 'seller@escrowmate.demo',
-        role: 'seller',
-      });
+    const { title, description, price, floor_price } = parsed.data;
+    if (floor_price != null && floor_price > price) {
+      return NextResponse.json(
+        { error: "Floor price cannot exceed the asking price" },
+        { status: 400 },
+      );
     }
-
-    const { data: newListing, error: insertError } = await supabaseAdmin
-      .from('listings')
+    const { data, error } = await supabaseAdmin
+      .from("listings")
       .insert({
-        seller_id: sellerId,
+        seller_id: user.id,
         title,
         description: description || null,
         price,
         floor_price: floor_price ?? null,
       })
-      .select(`
-        *,
-        seller:users!seller_id (
-          id,
-          email
-        )
-      `)
+      .select(
+        "id, seller_id, title, description, price, floor_price, created_at",
+      ) // owner-only response
       .single();
-
-    if (insertError) {
-      console.error('Error creating listing:', insertError);
+    if (error)
       return NextResponse.json(
-        { error: `Failed to create listing: ${insertError.message}` },
-        { status: 500 }
+        { error: "Failed to create listing" },
+        { status: 500 },
       );
-    }
-
-    return NextResponse.json(newListing, { status: 201 });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(data, { status: 201 });
+  } catch (err) {
+    return errorResponse(err);
   }
 }
-

@@ -1,83 +1,28 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import { requireUser, errorResponse } from '@/lib/auth/server';
+import { loadDealForMember } from '@/lib/deals/access';
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+/** Buyer-only: shipped -> return_window. The server stamps the window start; the client supplies nothing. */
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await requireUser('buyer');
     const { id } = await params;
+    const { deal } = await loadDealForMember(id, user);
+    if (deal.buyer_id !== user.id) return NextResponse.json({ error: 'Only the buyer can confirm receipt' }, { status: 403 });
+    if (deal.status !== 'shipped') return NextResponse.json({ error: 'Deal is not in the shipped state' }, { status: 409 });
 
-    if (!id) {
-      return NextResponse.json({ error: 'Deal ID is required' }, { status: 400 });
-    }
-
-    // 1. Fetch current deal to read existing terms_json
-    const { data: existingDeal, error: fetchErr } = await supabaseAdmin
+    const terms = (deal.terms_json && typeof deal.terms_json === 'object' ? deal.terms_json : {}) as Record<string, unknown>;
+    const { data: rows, error } = await supabaseAdmin
       .from('deals')
-      .select('id, terms_json, status')
+      .update({ status: 'return_window', terms_json: { ...terms, return_window_started_at: new Date().toISOString() } })
       .eq('id', id)
-      .maybeSingle();
-
-    if (fetchErr || !existingDeal) {
-      return NextResponse.json(
-        { error: `Deal not found: ${fetchErr?.message || 'Invalid ID'}` },
-        { status: 404 }
-      );
-    }
-
-    const currentTerms =
-      typeof existingDeal.terms_json === 'object' && existingDeal.terms_json !== null
-        ? (existingDeal.terms_json as Record<string, unknown>)
-        : {};
-
-    const updatedTerms = {
-      ...currentTerms,
-      return_window_started_at: new Date().toISOString(),
-    };
-
-    // 2. Transition deal status to return_window with timestamp recorded in terms_json
-    const { data: updatedDeal, error: updateErr } = await supabaseAdmin
-      .from('deals')
-      .update({
-        status: 'return_window',
-        terms_json: updatedTerms,
-      })
-      .eq('id', id)
-      .select(`
-        *,
-        listing:listings (
-          id,
-          seller_id,
-          title,
-          description,
-          price,
-          floor_price
-        ),
-        buyer:users!buyer_id (
-          id,
-          email,
-          role
-        ),
-        seller:users!seller_id (
-          id,
-          email,
-          role
-        )
-      `)
-      .single();
-
-    if (updateErr) {
-      return NextResponse.json(
-        { error: `Failed to confirm receipt: ${updateErr.message}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(updatedDeal, { status: 200 });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+      .eq('status', 'shipped')
+      .select('id, status, terms_json');
+    if (error) return NextResponse.json({ error: 'Failed to confirm receipt' }, { status: 500 });
+    if (!rows?.length) return NextResponse.json({ error: 'Deal state changed; refresh and retry' }, { status: 409 });
+    return NextResponse.json(rows[0]);
+  } catch (err) {
+    return errorResponse(err);
   }
 }
-
