@@ -117,10 +117,18 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 
 ## 🎥 Demo Video
 
+## 🎥 Demo Video
+
 <div align="center">
 
-<a href="#">
+<a href="https://youtu.be/YlMEGBsW2NQ">
 <img src="https://img.shields.io/badge/▶️_WATCH_THE_3--MINUTE_DEMO-FF0000?style=for-the-badge&logo=youtube&logoColor=white&labelColor=0A0A0F" height="50"/>
+</a>
+
+<br><br>
+
+<a href="https://youtu.be/YlMEGBsW2NQ">
+  <img width="80%" src="https://img.youtube.com/vi/YlMEGBsW2NQ/maxresdefault.jpg" alt="Brokerage AI — YouTube Demo Video"/>
 </a>
 
 </div>
