@@ -1,90 +1,42 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { ensureUserProfile } from '@/lib/auth/server';
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  role: z.enum(['buyer', 'seller'], {
-    errorMap: () => ({ message: "Role must be either 'buyer' or 'seller'" }),
-  }),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  name: z.string().trim().max(100).optional(),
+  role: z.enum(['buyer', 'seller'], { errorMap: () => ({ message: "Role must be either 'buyer' or 'seller'" }) }),
 });
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const parsed = signupSchema.safeParse(body);
-
+    const parsed = signupSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid input data' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid input data' }, { status: 400 });
+    }
+    const { email, password, name, role } = parsed.data;
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name || undefined, signup_role: role } } });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (!data.user) return NextResponse.json({ error: 'Signup failed' }, { status: 500 });
+
+    // Already-registered address: Supabase returns an obfuscated user with no identities. Do not
+    // touch any profile and answer exactly like a new signup (no account enumeration).
+    if (!data.user.identities || data.user.identities.length === 0) {
+      return NextResponse.json({ ok: true, needsConfirmation: true }, { status: 201 });
     }
 
-    const { email, password, role } = parsed.data;
-
-    // 1. Sign up user with Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { role },
-      },
-    });
-
-    if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 400 });
-    }
-
-    if (!authData.user) {
-      return NextResponse.json(
-        { error: 'Signup succeeded but no user returned' },
-        { status: 500 }
-      );
-    }
-
-    // 2. Upsert into public.users to ensure role and profile are recorded immediately
-    const { error: upsertError } = await supabaseAdmin
-      .from('users')
-      .upsert(
-        {
-          id: authData.user.id,
-          email: authData.user.email || email,
-          role,
-        },
-        { onConflict: 'id' }
-      );
-
-    if (upsertError) {
-      console.warn('Warning: Failed to upsert public.users row:', upsertError.message);
-    }
-
-    const response = NextResponse.json(
-      {
-        user: authData.user,
-        session: authData.session,
-        role,
-      },
+    // `signup_role` metadata is read once by the DB trigger when the row is created; authorization
+    // always uses public.users.role. ensureUserProfile also corrects a trigger-made default row.
+    const finalRole = await ensureUserProfile(data.user, role);
+    return NextResponse.json(
+      { ok: true, role: finalRole, needsConfirmation: !data.session },
       { status: 201 }
     );
-
-    const isProduction = process.env.NODE_ENV === 'production';
-    const cookieOptions = {
-      path: '/',
-      sameSite: 'lax' as const,
-      maxAge: 60 * 60 * 24 * 7,
-      secure: isProduction,
-      httpOnly: true,
-    };
-
-    response.cookies.set('escrowmate_user_id', authData.user.id, cookieOptions);
-    response.cookies.set('escrowmate_user_role', role, cookieOptions);
-
-    return response;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error during signup';
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (err) {
+    console.error('[auth/signup]', err);
+    return NextResponse.json({ error: 'Signup failed' }, { status: 500 });
   }
 }
-

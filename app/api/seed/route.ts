@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 const DEMO_SELLER_ID = '11111111-1111-1111-1111-111111111111';
 const DEMO_BUYER_ID = '22222222-2222-2222-2222-222222222222';
@@ -82,7 +82,14 @@ const DEMO_BUYER_PROFILES = [
   },
 ];
 
-export async function POST() {
+export async function POST(request: Request) {
+  // Dev-only: never available in production, and requires an explicit server-side secret.
+  if (process.env.NODE_ENV === 'production' || !process.env.SEED_SECRET) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (request.headers.get('x-seed-secret') !== process.env.SEED_SECRET) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
   try {
     // 1. Ensure demo users exist
     const { error: userError } = await supabaseAdmin
@@ -126,7 +133,7 @@ export async function POST() {
     // Fetch and return the active listings
     const { data: listings, error: fetchError } = await supabaseAdmin
       .from('listings')
-      .select('*')
+      .select('id, seller_id, title, description, price, created_at')
       .order('created_at', { ascending: false });
 
     if (fetchError) {

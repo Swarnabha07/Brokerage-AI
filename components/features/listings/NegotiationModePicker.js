@@ -47,16 +47,22 @@ export function NegotiationModePicker({ listingId, dealId }) {
           }),
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
         if (res.ok && data?.id) {
           router.push(`/deal/${data.id}`);
           return;
-        } else {
-          console.warn("Could not create deal via API, falling back:", data?.error);
         }
-      } catch (err) {
-        console.warn("API deal creation error, falling back to sample deal:", err);
+        // Real listings never fall back to a sample deal.
+        setErrorMsg(data?.error || "Could not start the deal.");
+      } catch {
+        setErrorMsg("Network error. Please try again.");
       }
+      setIsStarting(false);
+      return;
     }
 
     // Fallback to sample/demo deal

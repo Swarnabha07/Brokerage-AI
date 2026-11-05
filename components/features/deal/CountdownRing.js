@@ -30,21 +30,20 @@ export function CountdownRing({ totalSeconds = 60, startedAt, onComplete }) {
     callback.current = onComplete;
   }, [onComplete]);
 
-  // Sync remaining seconds if startedAt or totalSeconds changes
-  useEffect(() => {
-    if (startedAt) {
-      setLeft(calculateRemainingSeconds(totalSeconds, startedAt));
-    }
-  }, [startedAt, totalSeconds]);
-
+  // Display-only timer. Re-derives from the wall clock each tick (no drift, refresh-safe).
+  // The parent remounts this component (key=startedAt) if the start time changes.
+  // onComplete only asks the SERVER to re-check; it never authorizes a release.
   useEffect(() => {
     if (left <= 0) {
       const done = setTimeout(() => callback.current?.(), 600);
       return () => clearTimeout(done);
     }
-    const tick = setTimeout(() => setLeft((s) => Math.max(0, s - 1)), 1000);
+    const tick = setTimeout(
+      () => setLeft(calculateRemainingSeconds(totalSeconds, startedAt)),
+      1000,
+    );
     return () => clearTimeout(tick);
-  }, [left]);
+  }, [left, totalSeconds, startedAt]);
 
   const offset = CIRCUMFERENCE * (1 - left / totalSeconds);
 

@@ -1,25 +1,8 @@
 import { NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function POST() {
-  const response = NextResponse.json({ ok: true, message: 'Logged out successfully' });
-
-  // Clear authentication cookies
-  response.cookies.set('escrowmate_user_id', '', {
-    path: '/',
-    maxAge: 0,
-    expires: new Date(0),
-    httpOnly: true,
-    sameSite: 'lax',
-  });
-
-  response.cookies.set('escrowmate_user_role', '', {
-    path: '/',
-    maxAge: 0,
-    expires: new Date(0),
-    httpOnly: true,
-    sameSite: 'lax',
-  });
-
-  return response;
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut(); // clears the Supabase session cookies
+  return NextResponse.json({ ok: true });
 }
-

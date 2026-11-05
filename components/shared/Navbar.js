@@ -52,20 +52,17 @@ export function Navbar() {
       if (!isMounted) return;
       if (session?.user) {
         setUser(session.user);
-        let role = session.user.user_metadata?.role;
-        if (!role) {
-          try {
-            const { data } = await supabase
-              .from("users")
-              .select("role")
-              .eq("id", session.user.id)
-              .maybeSingle();
-            if (data?.role) {
-              role = data.role;
-            }
-          } catch {
-            // fallback role
-          }
+        // Display-only: role comes from public.users (never user_metadata). Authorization is server-side.
+        let role = null;
+        try {
+          const { data } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          role = data?.role ?? null;
+        } catch {
+          // role stays null
         }
         if (isMounted) {
           setUserRole(role || "buyer");

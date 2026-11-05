@@ -9,7 +9,6 @@ import { Field, Input } from "@/components/ui/field";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { cn } from "@/lib/utils";
 import { signInWithGoogle } from "@/lib/auth/session";
-import { supabase } from "@/lib/supabase";
 
 function GoogleIcon(props) {
   return (
@@ -40,7 +39,8 @@ function validate(mode, v) {
     errors.name = "Enter your name.";
   if (!/^\S+@\S+\.\S+$/.test(v.email))
     errors.email = "Enter a valid email address.";
-  if (v.password.length < 6) errors.password = "Use at least 6 characters.";
+  if (v.password.length < (mode === "signup" ? 8 : 1))
+    errors.password = mode === "signup" ? "Use at least 8 characters." : "Enter your password.";
   return errors;
 }
 
@@ -90,7 +90,7 @@ export function AuthForm({ mode, initialError = "" }) {
     try {
       const endpoint = isSignup ? "/api/auth/signup" : "/api/auth/login";
       const payload = isSignup
-        ? { email: values.email, password: values.password, role: values.role }
+        ? { email: values.email, password: values.password, role: values.role, name: values.name }
         : { email: values.email, password: values.password };
 
       const res = await fetch(endpoint, {
@@ -107,16 +107,11 @@ export function AuthForm({ mode, initialError = "" }) {
         return;
       }
 
-      // Persist Supabase session in the browser client
-      if (data.session?.access_token && data.session?.refresh_token) {
-        try {
-          await supabase.auth.setSession({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-          });
-        } catch (sessionErr) {
-          console.warn("Could not set browser Supabase session:", sessionErr);
-        }
+      // The session is set by the server as Supabase cookies; nothing to store client-side.
+      if (isSignup && data.needsConfirmation) {
+        setSuccessMsg("Account created. Check your email to confirm your address, then log in.");
+        setIsLoading(false);
+        return;
       }
 
       setSuccessMsg(
@@ -125,17 +120,15 @@ export function AuthForm({ mode, initialError = "" }) {
           : "Signed in successfully! Redirecting..."
       );
 
-      const targetRole = data.role || values.role;
+      // Destination is decided by the server-verified role, not the form selection.
+      const targetRole = data.role;
       setTimeout(() => {
         const destination = targetRole === "seller" ? "/seller/dashboard" : "/buyer/dashboard";
         router.push(destination);
         router.refresh();
       }, 800);
     } catch {
-      setServerError("Network error or server unavailable. Redirecting in demo mode...");
-      setTimeout(() => {
-        router.push(values.role === "seller" ? "/seller/dashboard" : "/buyer/dashboard");
-      }, 1200);
+      setServerError("Network error or server unavailable. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -174,7 +167,7 @@ export function AuthForm({ mode, initialError = "" }) {
       <div className="mt-6">
         <fieldset>
           <legend className="mb-2 text-sm font-medium">
-            {isSignup ? "I want to" : "Continue as"}
+            {isSignup ? "I want to" : "Role for new Google accounts"}
           </legend>
           <div className="grid grid-cols-2 gap-3">
             {[

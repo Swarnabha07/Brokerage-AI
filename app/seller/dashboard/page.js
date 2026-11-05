@@ -10,16 +10,18 @@ import { GlassCard } from "@/components/shared/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { getSellerDashboard } from "@/lib/api/deals";
-import { getActiveUserSession } from "@/lib/auth/session";
+import { redirect } from "next/navigation";
+import { getVerifiedUser } from "@/lib/auth/server";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export const metadata = { title: "Seller dashboard" };
 
 export default async function SellerDashboardPage() {
-  const user = await getActiveUserSession();
-  const sellerId = user?.id || "11111111-1111-1111-1111-111111111111";
+  const user = await getVerifiedUser();
+  if (!user) redirect("/login");
+  if (user.role !== "seller") redirect("/buyer/dashboard");
   const { viewer, stats, listings, activeDeals, payouts } =
-    await getSellerDashboard(sellerId);
+    await getSellerDashboard(user);
 
   const columns = [
     { key: "title", header: "Item" },
@@ -33,7 +35,7 @@ export default async function SellerDashboardPage() {
       header: "Status",
       render: (r) =>
         r.payoutStatus === "released" ? (
-          <Badge variant="success">Released (sample)</Badge>
+          <Badge variant="success">Released (app ledger)</Badge>
         ) : (
           <Badge variant="warning">Pending</Badge>
         ),
@@ -52,13 +54,8 @@ export default async function SellerDashboardPage() {
         title="Seller dashboard"
         description={
           <>
-            {user ? `Active account: ${viewer.name}. ` : `Sample data for ${viewer.name}. `}
-            <Link
-              href="/buyer/dashboard"
-              className="underline underline-offset-4 hover:text-foreground"
-            >
-              Switch to the buyer view
-            </Link>
+            {`Signed in as ${viewer.name}. `}
+
           </>
         }
         action={
@@ -87,7 +84,7 @@ export default async function SellerDashboardPage() {
           label="Pending payout"
           value={stats.pendingPayout}
           delay={0.16}
-          note="Sample amount; no payout occurs"
+          note="App-ledger amount; no PayPal payout yet"
         />
       </div>
 
@@ -146,7 +143,7 @@ export default async function SellerDashboardPage() {
           Payouts
         </h2>
         <TransactionsTable
-          caption="Sample payouts"
+          caption="Payouts"
           columns={columns}
           rows={payouts}
           emptyTitle="No payouts yet"

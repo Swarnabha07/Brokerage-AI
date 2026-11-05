@@ -80,6 +80,7 @@ export function StagePanel({
   accepted,
   onAccept,
   onAdvance,
+  onWindowEnd,
   returnWindowSeconds,
   isLive = false,
   isPending = false,
@@ -91,25 +92,31 @@ export function StagePanel({
       <>
         <PanelTitle simulated={!isLive}>Negotiation</PanelTitle>
         <p className="mb-4 text-xs text-muted-foreground">
-          {isLive ? "Negotiation transcript recorded on Supabase." : "Sample transcript."}
+          {isLive
+            ? "Negotiation transcript recorded on Supabase."
+            : "Sample transcript."}
         </p>
-        <ul
-          className="mb-6 space-y-4"
-          aria-label="Negotiation transcript"
-        >
+        <ul className="mb-6 space-y-4" aria-label="Negotiation transcript">
           {deal.messages.map((m) => (
             <ChatBubble key={m.id} sender={m.sender} text={m.text} />
           ))}
         </ul>
-        <Button onClick={() => onAdvance("agreed")} disabled={isPending}>
-          {isPending ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> Updating...
-            </span>
-          ) : (
-            "Accept terms & conclude negotiation"
-          )}
-        </Button>
+        {role === "buyer" || role === "seller" ? (
+          <Button onClick={() => onAdvance("agreed")} disabled={isPending}>
+            {isPending ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Updating...
+              </span>
+            ) : (
+              "Accept terms & conclude negotiation"
+            )}
+          </Button>
+        ) : (
+          <Waiting>
+            Your role could not be verified for this deal. Refresh the page
+            before continuing.
+          </Waiting>
+        )}
       </>
     );
   }
@@ -132,15 +139,13 @@ export function StagePanel({
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                <Send className="h-4 w-4" aria-hidden="true" /> Approve terms &amp; create invoice
+                <Send className="h-4 w-4" aria-hidden="true" /> Approve terms
+                &amp; create invoice
               </span>
             )}
           </Button>
         ) : (
-          <Waiting>
-            Waiting for the seller to approve these terms. Switch to the seller
-            view in the demo controls to continue.
-          </Waiting>
+          <Waiting>Waiting for the seller to approve these terms.</Waiting>
         )}
       </>
     );
@@ -153,8 +158,8 @@ export function StagePanel({
         <dl className="mb-6 space-y-3 rounded-xl border border-border p-4 text-sm">
           <Row label="Item price" value={formatCurrency(amounts.price)} />
           <Row
-            label={`Platform fee (${FEE_RATE_LABEL})`}
-            value={`-${formatCurrency(amounts.fee)}`}
+            label={`Platform fee (${FEE_RATE_LABEL}, buyer-paid)`}
+            value={`+${formatCurrency(amounts.fee)}`}
           />
           <Row
             label="Total due (Buyer)"
@@ -162,13 +167,14 @@ export function StagePanel({
             strong
           />
           <Row
-            label="Seller receives upon payout"
+            label="Seller receives (full item price)"
             value={formatCurrency(amounts.sellerAmount)}
           />
         </dl>
         <p className="mb-5 flex gap-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          Invoice generated. Captured funds will be held in sandbox escrow until delivery is confirmed.
+          Invoice generated. Demo fee model; PayPal Sandbox payment capture is
+          not connected yet.
         </p>
         {role === "buyer" ? (
           <div className="space-y-4">
@@ -180,28 +186,24 @@ export function StagePanel({
                 className="mt-0.5 h-4 w-4 accent-[#7c3aed]"
                 disabled={isPending}
               />
-              <span>
-                I reviewed the invoice terms and authorize the payment hold.
-              </span>
+              <span>I reviewed the invoice terms.</span>
             </label>
             <Button
               disabled={!accepted || isPending}
-              onClick={() => onAdvance("paid", { payment_method: "paypal_sandbox" })}
+              onClick={() => onAdvance("paid")}
             >
               {isPending ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Processing payment...
+                  <Loader2 className="h-4 w-4 animate-spin" /> Processing
+                  payment...
                 </span>
               ) : (
-                "Pay invoice (PayPal Sandbox)"
+                "Pay invoice (PayPal Sandbox — coming soon)"
               )}
             </Button>
           </div>
         ) : (
-          <Waiting>
-            Waiting for the buyer to pay. Switch to the buyer view in the demo
-            controls to continue.
-          </Waiting>
+          <Waiting>Waiting for the buyer to pay.</Waiting>
         )}
       </>
     );
@@ -210,19 +212,25 @@ export function StagePanel({
   if (status === "paid") {
     return (
       <>
-        <PanelTitle simulated={!isLive}>Payment &amp; Escrow Hold</PanelTitle>
-        <Result icon={CheckCircle2} title="Payment Captured &amp; Held in Escrow">
-          Payment confirmed. Funds are securely held and will only be released
-          to the seller after delivery confirmation and return window expiration.
+        <PanelTitle simulated={!isLive}>Payment</PanelTitle>
+        <Result icon={CheckCircle2} title="Payment recorded">
+          Payment recorded. The deal is released to the seller only after
+          delivery confirmation and the return window ends (server-controlled,
+          app-managed workflow).
         </Result>
         {role === "seller" ? (
           <Button
-            onClick={() => onAdvance("shipped", { tracking_number: "TRK-2026-0042" })}
+            onClick={() =>
+              onAdvance("shipped", {
+                tracking_number: `TRK-${Date.now().toString(36).toUpperCase()}`,
+              })
+            }
             disabled={isPending}
           >
             {isPending ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> Updating shipment...
+                <Loader2 className="h-4 w-4 animate-spin" /> Updating
+                shipment...
               </span>
             ) : (
               <span className="flex items-center gap-2">
@@ -231,10 +239,7 @@ export function StagePanel({
             )}
           </Button>
         ) : (
-          <Waiting>
-            Waiting for the seller to ship. Switch to the seller view to
-            continue.
-          </Waiting>
+          <Waiting>Waiting for the seller to ship.</Waiting>
         )}
       </>
     );
@@ -247,25 +252,26 @@ export function StagePanel({
         <Result icon={Truck} title="Order Shipped">
           {deal.tracking_number
             ? `Tracking number: ${deal.tracking_number}. Awaiting buyer receipt confirmation.`
-            : "Tracking number: TRK-2026-0042. Item is in transit."}
+            : "Item is in transit."}
         </Result>
         {role === "buyer" ? (
-          <Button onClick={() => onAdvance("return_window")} disabled={isPending}>
+          <Button
+            onClick={() => onAdvance("return_window")}
+            disabled={isPending}
+          >
             {isPending ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Confirming...
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                <PackageCheck className="h-4 w-4" aria-hidden="true" /> Confirm delivery &amp; start return window
+                <PackageCheck className="h-4 w-4" aria-hidden="true" /> Confirm
+                delivery &amp; start return window
               </span>
             )}
           </Button>
         ) : (
-          <Waiting>
-            Waiting for the buyer to confirm receipt. Switch to the buyer view
-            to continue.
-          </Waiting>
+          <Waiting>Waiting for the buyer to confirm receipt.</Waiting>
         )}
       </>
     );
@@ -281,13 +287,16 @@ export function StagePanel({
       <>
         <PanelTitle simulated={!isLive}>Inspection Window</PanelTitle>
         <CountdownRing
+          key={startedAt || "no-start"}
           totalSeconds={returnWindowSeconds || 60}
           startedAt={startedAt}
-          onComplete={() => onAdvance("released")}
+          onComplete={onWindowEnd}
         />
         <p className="mx-auto mt-5 max-w-md text-center text-sm text-muted-foreground">
-          Inspection window active ({returnWindowSeconds || 60}s demo timer, clearly labeled as simulating a real return period). When it ends without dispute,
-          the held funds are automatically dispatched to the seller via PayPal Payouts.
+          Inspection window active ({returnWindowSeconds || 60}s demo timer,
+          clearly labeled as simulating a real return period). When it ends
+          without dispute, the deal is released by the server and a payout
+          record is created (no PayPal payout yet).
         </p>
       </>
     );
@@ -297,8 +306,10 @@ export function StagePanel({
     <>
       <PanelTitle simulated={!isLive}>Settlement &amp; Payout</PanelTitle>
       <Result icon={PackageCheck} title="Deal Completed">
-        Funds released! Net payout of {formatCurrency(amounts.sellerAmount)} dispatched
-        to seller (platform fee retained: {formatCurrency(amounts.fee)}).
+        Deal released. Seller payout recorded:{" "}
+        {formatCurrency(amounts.sellerAmount)}
+        (platform fee from buyer: {formatCurrency(amounts.fee)}). No PayPal
+        payout has been made yet.
       </Result>
     </>
   );

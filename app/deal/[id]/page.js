@@ -1,20 +1,20 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { DealWorkspace } from "@/components/features/deal/DealWorkspace";
-import { getAllDealIds, getDealById } from "@/lib/api/deals";
+import { getDealById, isUuid } from "@/lib/api/deals";
+import { getVerifiedUser } from "@/lib/auth/server";
 import { DEMO_RETURN_WINDOW_SECONDS } from "@/lib/config";
 import { FEE_RATE_LABEL } from "@/lib/fees";
 
 export const metadata = { title: "Deal" };
 
-export async function generateStaticParams() {
-  const ids = await getAllDealIds();
-  return ids.map((id) => ({ id }));
-}
-
+// Real deals are private and per-user: no generateStaticParams, rendered per request.
 export default async function DealPage({ params }) {
   const { id } = await params;
-  const deal = await getDealById(id);
-  if (!deal) notFound();
+  const user = isUuid(id) ? await getVerifiedUser() : null;
+  if (isUuid(id) && !user) redirect("/login");
+
+  const deal = await getDealById(id, user);
+  if (!deal) notFound(); // non-members get the same 404 as a missing deal
 
   return (
     <DealWorkspace
