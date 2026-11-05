@@ -131,7 +131,7 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 
 | 🔗 Hosted Demo | 🧪 Sandbox Test Accounts |
 |:---:|:---:|
-| [brokerage-ai.vercel.app](#) | [`/docs/test-accounts.md`](#) |
+| [brokerage-ai.vercel.app](https://brokerage-ai.vercel.app/) | [`/docs/test-accounts.md`](#) |
 
 </div>
 
