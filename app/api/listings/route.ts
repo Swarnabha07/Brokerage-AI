@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireUser, errorResponse } from "@/lib/auth/server";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+// Caps how fast one seller account can flood the public listings feed.
+const CREATE_LIMIT = 20;
+const CREATE_WINDOW_MS = 60 * 60 * 1000; // 20 listings / hour / seller
 
 const createListingSchema = z
   .object({
@@ -17,12 +22,14 @@ const createListingSchema = z
   .strict();
 
 // Public browse list. floor_price is private to the seller and never selected here.
+// seller email is likewise never selected: this endpoint has no auth check, so anyone
+// (including scrapers) can hit it, and email addresses would otherwise be harvestable.
 export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
       .from("listings")
       .select(
-        "id, seller_id, title, description, price, created_at, seller:users!seller_id(id, email)",
+        "id, seller_id, title, description, price, created_at",
       )
       .order("created_at", { ascending: false });
     if (error)
@@ -39,6 +46,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await requireUser("seller");
+
+    const rate = checkRateLimit(`listing:create:${user.id}`, CREATE_LIMIT, CREATE_WINDOW_MS);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Too many listings created. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+      );
+    }
+
     const parsed = createListingSchema.safeParse(
       await request.json().catch(() => null),
     );
