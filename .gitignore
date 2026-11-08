@@ -58,3 +58,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PayPal Gate 1 smoke-test state (local test identifiers only; never commit)
+/.paypal-smoke-state.json
+/.paypal-smoke-state.json.tmp
+/.paypal-smoke-state.v2*.json
