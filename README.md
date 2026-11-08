@@ -117,8 +117,6 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 
 ## 🎥 Demo Video
 
-## 🎥 Demo Video
-
 <div align="center">
 
 <a href="https://youtu.be/YlMEGBsW2NQ">
