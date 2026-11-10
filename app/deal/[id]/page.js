@@ -8,8 +8,10 @@ import { FEE_RATE_LABEL } from "@/lib/fees";
 export const metadata = { title: "Deal" };
 
 // Real deals are private and per-user: no generateStaticParams, rendered per request.
-export default async function DealPage({ params }) {
+export default async function DealPage({ params, searchParams }) {
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
+  const paymentParam = ["return", "cancelled"].includes(sp.payment) ? sp.payment : null;
   const user = isUuid(id) ? await getVerifiedUser() : null;
   if (isUuid(id) && !user) redirect("/login");
 
@@ -21,6 +23,7 @@ export default async function DealPage({ params }) {
       deal={deal}
       returnWindowSeconds={DEMO_RETURN_WINDOW_SECONDS}
       feeLabel={FEE_RATE_LABEL}
+      paymentParam={paymentParam}
     />
   );
 }

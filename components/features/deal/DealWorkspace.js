@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Bot, CheckCircle2, Circle, RotateCcw } from "lucide-react";
@@ -10,12 +10,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DealStepper } from "@/components/features/deal/DealStepper";
 import { StagePanel } from "@/components/features/deal/DealPanels";
+import { LiveStagePanel } from "@/components/features/deal/LivePanels";
+import { TransactionHistory } from "@/components/features/deal/TransactionHistory";
 import { DEAL_STATUS_ORDER } from "@/lib/constants/deal-status";
 import {
   updateDealStage,
   confirmReceived,
   checkRelease,
   isLiveDealId,
+  capturePayment,
+  proposeTerms,
+  acceptTransactionTerms,
 } from "@/lib/api/payments";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -35,6 +40,7 @@ export function DealWorkspace({
   deal,
   returnWindowSeconds = 60,
   feeLabel = "3%",
+  paymentParam = null,
 }) {
   const router = useRouter();
   const isLive = isLiveDealId(deal?.id);
@@ -54,12 +60,66 @@ export function DealWorkspace({
   const [accepted, setAccepted] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState("");
-  // Bumped on every "Reset simulation" click so the stage panel (and the
-  // CountdownRing inside it) always remounts, even when the reset puts
-  // status/startedAt back to values that happen to be unchanged.
+  // Keep the demo reset behavior from the updated base commit.
   const [resetNonce, setResetNonce] = useState(0);
   const status = currentDeal.status;
   const index = DEAL_STATUS_ORDER.indexOf(status);
+
+  // Returning from PayPal: the redirect proves NOTHING. Ask the server to re-read and verify the order;
+  // the deal only becomes paid if that verification succeeds.
+  const handledReturn = useRef(false);
+  const [paymentMsg, setPaymentMsg] = useState(() =>
+    !isLive || !paymentParam
+      ? ""
+      : paymentParam === "cancelled"
+        ? "Checkout was cancelled. No payment was taken."
+        : role === "buyer"
+          ? "Verifying your payment with PayPal…"
+          : "",
+  );
+  useEffect(() => {
+    if (!isLive || !paymentParam || handledReturn.current) return;
+    handledReturn.current = true;
+    const clear = () => router.replace(`/deal/${deal.id}`);
+    if (paymentParam === "cancelled") {
+      clear();
+      return;
+    }
+    if (paymentParam === "return" && role === "buyer") {
+      capturePayment(deal.id)
+        .then((r) =>
+          setPaymentMsg(
+            r.status === "captured"
+              ? "Payment verified with PayPal."
+              : r.status === "needs_review"
+                ? "PayPal reports a capture after this deal was cancelled or changed. It is recorded for manual reconciliation."
+                : r.status === "cancelled"
+                  ? "This deal was cancelled before capture started. No new capture was requested."
+              : r.status === "pending"
+                ? "PayPal reports the payment as pending. It will update when PayPal confirms."
+                : r.status === "declined"
+                  ? "PayPal declined that payment method. Try again with another."
+                  : "Payment is not confirmed yet. Use “refresh status” if you completed it at PayPal.",
+          ),
+        )
+        .catch((e) => setPaymentMsg(e instanceof Error ? e.message : "Could not verify the payment"))
+        .finally(() => {
+          clear();
+          router.refresh();
+        });
+    }
+  }, [isLive, paymentParam, role, deal.id, router]);
+
+  // Read-only refresh while money or a window is in flight (GETs never change state).
+  useEffect(() => {
+    if (!isLive) return;
+    const watching =
+      ["invoiced", "return_window", "disputed"].includes(status) ||
+      (status === "released" && currentDeal.payout?.status !== "succeeded");
+    if (!watching) return;
+    const id = setInterval(() => router.refresh(), 20000);
+    return () => clearInterval(id);
+  }, [isLive, status, currentDeal.payout?.status, router]);
 
   // Realtime is only a "something changed" signal; the server re-renders the authoritative state.
   useEffect(() => {
@@ -124,6 +184,14 @@ export function DealWorkspace({
     }
   }
 
+  async function termsAction(action) {
+    setError("");
+    setIsPending(true);
+    try { await action(); router.refresh(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Terms update failed"); }
+    finally { setIsPending(false); }
+  }
+
   // Countdown end: ask the server to re-check; it decides using its own clock.
   async function onWindowEnd() {
     if (!isLive) {
@@ -172,20 +240,36 @@ export function DealWorkspace({
             <DealStepper status={status} />
           </GlassCard>
           <GlassCard hover={false} className="p-6 md:p-8">
-            <StagePanel
-              key={resetNonce}
-              status={status}
-              role={role}
-              deal={currentDeal}
-              accepted={accepted}
-              onAccept={setAccepted}
-              onAdvance={advance}
-              onWindowEnd={onWindowEnd}
-              returnWindowSeconds={returnWindowSeconds}
-              isLive={isLive}
-              isPending={isPending}
-            />
+            {isLive && status !== "negotiating" ? (
+              <LiveStagePanel
+                deal={currentDeal}
+                role={role}
+                onChanged={() => router.refresh()}
+                onWindowEnd={onWindowEnd}
+              />
+            ) : (
+              <StagePanel
+                key={resetNonce}
+                status={status}
+                role={role}
+                deal={currentDeal}
+                accepted={accepted}
+                onAccept={setAccepted}
+                onAdvance={advance}
+                onProposeTerms={(price, terms) => termsAction(() => proposeTerms(deal.id, price, terms))}
+                onAcceptTerms={() => termsAction(() => acceptTransactionTerms(deal.id))}
+                onWindowEnd={onWindowEnd}
+                returnWindowSeconds={returnWindowSeconds}
+                isLive={isLive}
+                isPending={isPending}
+              />
+            )}
           </GlassCard>
+          {paymentMsg && (
+            <p role="status" className="rounded-xl border border-border bg-muted/40 p-3 text-sm">
+              {paymentMsg}
+            </p>
+          )}
           {error && (
             <p
               role="alert"
@@ -261,10 +345,16 @@ export function DealWorkspace({
               </div>
             </dl>
             <p className="mt-3 text-xs text-muted-foreground">
-              Provisional demo fee model: the buyer pays the fee on top; the
-              seller receives the full agreed price.
+              {isLive
+                ? "The buyer pays the platform fee on top; the seller receives the full agreed price. PayPal's own fees are paid by Brokerage AI."
+                : "Provisional demo fee model: the buyer pays the fee on top; the seller receives the full agreed price."}
             </p>
           </GlassCard>
+          {isLive && (
+            <GlassCard hover={false} className="p-6">
+              <TransactionHistory deal={currentDeal} />
+            </GlassCard>
+          )}
 
           <GlassCard hover={false} className="p-6">
             <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">

@@ -1,6 +1,6 @@
 # Brokerage AI
 
-AI-negotiated, PayPal-settled escrow for peer-to-peer transactions.
+Peer-to-peer transactions with PayPal Sandbox Checkout and application-managed release tracking.
 
 Built for the PayPal AI Hackathon (2026).
 
@@ -29,9 +29,9 @@ Built for the PayPal AI Hackathon (2026).
 
 ## 1. Overview
 
-Brokerage AI is a prototype marketplace where two parties — a buyer and a seller — can negotiate and settle a transaction without needing to trust each other directly. Each party can optionally delegate the negotiation to an AI agent acting on their behalf. Once terms are agreed, the platform handles invoicing, payment, and a delayed, conditional payout through PayPal's Sandbox APIs, so funds are only released to the seller after delivery is confirmed and a return window has passed.
+Brokerage AI is a prototype marketplace where a buyer and seller can agree to versioned transaction terms, pay through PayPal Checkout, and follow delivery and payout status. Both parties must accept the same terms before an internal Brokerage AI invoice can be issued. AI negotiation is planned separately and is not implemented in this transaction flow.
 
-This is a hackathon prototype, not a production financial product. It runs entirely against PayPal's Sandbox environment, using test accounts and simulated money. No real transactions occur anywhere in this project.
+This is a hackathon prototype, not a production financial product. PayPal integration is Sandbox-only. Production eligibility, payout availability, and legal approval for an application-managed hold have not been established.
 
 ---
 
@@ -41,7 +41,7 @@ Peer-to-peer transactions between people who don't know each other — a local m
 
 Formal escrow services exist, but they are built for high-value transactions (real estate, business sales) and are too heavy, slow, and expensive for everyday deals. There is no lightweight, automated way for two strangers to negotiate fair terms and have those terms actually enforced by where the money sits.
 
-Brokerage AI is a prototype exploring whether an AI agent, combined with PayPal's existing payment infrastructure, can fill that gap: negotiate on a person's behalf, draft clear terms, and hold the platform accountable to a release condition instead of relying on goodwill alone.
+Brokerage AI explores a structured transaction flow with mutual terms acceptance, server-side payment verification, delivery confirmation, and release conditions. The application-managed hold is not PayPal-native escrow.
 
 ---
 
@@ -49,19 +49,18 @@ Brokerage AI is a prototype exploring whether an AI agent, combined with PayPal'
 
 1. A seller lists an item or service.
 2. A buyer starts a deal on that listing.
-3. The buyer chooses one of two negotiation modes:
-   - **Self Chat** — the buyer negotiates directly with the seller's AI agent.
-   - **AI Negotiate** — the buyer's AI agent and the seller's AI agent negotiate with each other, within a capped number of exchanges.
-4. Once both sides reach agreement on price and terms, the AI produces a structured summary of what was agreed.
-5. The seller reviews and approves the terms.
-6. The platform creates a PayPal invoice reflecting the agreed price and a platform fee.
-7. The buyer reviews the invoice on the platform (not redirected to PayPal) and pays through an embedded PayPal checkout.
-8. Payment is captured into the platform's PayPal Sandbox business account. The funds are not yet released to the seller.
-9. The seller marks the item as shipped and provides tracking information.
-10. The buyer confirms the item was received.
-11. A return window begins. For demo purposes this window is a short, visible countdown rather than a multi-day period — this is explicitly a simulation of a real return policy, not a claim that real-world return windows are this short.
-12. When the window closes without a dispute, the platform triggers a PayPal payout to the seller for the agreed item price (retaining the 3% platform fee collected at checkout).
-13. Both the buyer and seller dashboards reflect the deal as complete.
+3. The seller proposes versioned final terms, including the price and delivery conditions.
+4. The buyer and seller each accept the same immutable terms version.
+5. The seller issues an internal Brokerage AI invoice reflecting the accepted price and platform fee.
+6. The buyer approves and pays through PayPal Checkout.
+7. PayPal Checkout is verified server-side; the capture is not considered paid until the provider response passes verification.
+8. The seller marks the item as shipped and provides tracking information.
+9. The buyer confirms delivery (or an administrator verifies it); seller tracking alone does not start the return window.
+10. The configured return window starts (24 hours by default).
+11. After it ends without a dispute or review hold, the server evaluates eligibility and initiates PayPal Payouts.
+12. The deal is complete only after PayPal confirms the individual payout item succeeded.
+
+For physical goods, PayPal Checkout does not collect or verify shipping addresses or delivery. The seller records delivery expectations in terms accepted by both parties; tracking references are not carrier-verified. Services use the same flow with a service deliverable and due date in the accepted terms.
 
 ---
 
@@ -71,14 +70,13 @@ Brokerage AI is a prototype exploring whether an AI agent, combined with PayPal'
 |---|---|
 | Role-based accounts | Users sign up as either a buyer or a seller and are routed to a dashboard built for that role. |
 | Seeded listings | A small set of demo listings exist so the negotiation and transaction flow can be demonstrated without building a full marketplace/search experience. |
-| AI negotiation (agent-to-agent) | Two independently prompted AI agents, one representing the buyer's stated budget and conditions and one representing the seller's price floor and conditions, exchange offers up to a fixed number of rounds. |
-| Self-chat alternative | A buyer who does not want to delegate negotiation can chat directly with the seller's AI agent instead. |
-| Structured terms extraction | Once agreement is reached, the negotiation transcript is parsed into a structured terms summary (price, item, delivery terms, conditions) rather than left as unstructured chat text. |
-| Real PayPal invoicing | A genuine invoice is created and sent through PayPal's Sandbox Invoicing API, not a custom-built invoice document. |
-| On-site checkout | Payment is captured through PayPal's Orders API embedded directly in the platform's own UI, rather than redirecting the buyer to a PayPal-hosted page. |
+| AI negotiation | Planned; not implemented in this transaction flow. |
+| Mutual terms acceptance | Buyer and seller accept the same versioned terms snapshot; changes clear prior acceptances. |
+| Internal invoice | Brokerage AI stores its own invoice; it does not use the PayPal Invoice API. |
+| PayPal Checkout | The buyer approves a PayPal Sandbox order; the server verifies the order and capture. |
 | Held funds, conditional release | Captured funds are not forwarded to the seller immediately. Release is deferred until delivery is confirmed and a return window passes. |
-| Automated payout with platform fee | The platform calculates the 3% platform fee as a separate line item at checkout and dispatches the agreed item price to the seller via PayPal's Payouts API once conditions are met. |
-| Scoped agent permissions | The buyer's AI agent and the seller's AI agent are each given access to a different, limited subset of PayPal's Agent Toolkit tools, matching what that role should be able to do. |
+| Automated payout with platform fee | The buyer pays the 3% fee with the agreed price; after release conditions, the server initiates and verifies a PayPal Payouts item. Provider fees are recorded separately. |
+| Server-side financial controls | Routes and database functions authorize state changes; no AI agent has PayPal money-moving tools. |
 
 ---
 
@@ -93,13 +91,13 @@ Brokerage AI is a prototype exploring whether an AI agent, combined with PayPal'
 Renders the buyer and seller dashboards, the deal detail/negotiation page, the invoice and checkout UI, and the status tracker. Never calls PayPal or the AI model directly — every external call goes through the backend.
 
 **Backend (Next.js API routes)**
-Owns the deal state machine (`negotiating → agreed → invoiced → paid → shipped → return_window → released`). Orchestrates calls to the AI layer and the PayPal layer, and is the only part of the system holding API credentials.
+Owns the deal state machine (`negotiating → agreed → invoiced → paid → shipped → return_window → released`). It uses server-side PayPal REST calls and database functions; payment credentials remain server-only.
 
-**AI layer (Google Gemini via the Vercel AI SDK)**
-Runs the buyer and seller negotiation agents, the terms-extraction step, and (where implemented) the listing/buyer-matching step. Each agent is a distinct system prompt and a distinct, scoped tool set — not two separate models.
+**AI layer (planned)**
+Gemini dependencies exist, but the transaction implementation does not run buyer/seller negotiation agents or AI terms extraction.
 
-**PayPal layer (PayPal Agent Toolkit, Sandbox)**
-Executes the actual PayPal actions: creating and sending invoices, creating and capturing orders, and issuing payouts. These calls are made through tools bound directly to the AI agents, not through hand-written REST calls made after the fact.
+**PayPal layer (Sandbox)**
+Uses native server-side REST calls for Orders, capture, refunds, Payouts, and webhook verification. The Agent Toolkit is installed but not used for this flow.
 
 **Database (Supabase / Postgres)**
 Stores users, listings, deals, messages, invoice records, and payout records. This is the single source of truth that both dashboards read from.
@@ -108,37 +106,25 @@ Stores users, listings, deals, messages, invoice records, and payout records. Th
 
 ## 6. PayPal Integration
 
-This project uses PayPal's Sandbox environment and the following APIs, accessed through the PayPal Agent Toolkit:
+This project uses PayPal Sandbox and native server-side REST calls:
 
 | API | Used For |
 |---|---|
 | Orders API | Creating and capturing the buyer's payment through the platform's own checkout UI. |
-| Invoicing API | Creating and sending a formal invoice once terms are agreed, and recording it as paid after checkout. |
+| Brokerage AI internal invoice | Records the agreed terms and amounts in the application database. The PayPal Invoicing API is not used. |
 | Payouts API | Releasing held funds to the seller, net of the platform fee, once the return window closes. |
 
-PayPal does not provide a dedicated escrow primitive. The "hold funds, then release" behavior in this project is implemented by the platform itself: capturing payment into the platform's own Sandbox business account first, and only calling the Payouts API once the return-window condition is met. This is stated plainly rather than implied, since it is a meaningful distinction from a true third-party escrow service.
+The application-managed hold is not PayPal-native escrow or delayed disbursement. The buyer pays through PayPal Checkout, the application tracks transaction state, and Brokerage AI later initiates a seller payout through PayPal Payouts after release conditions are met. This flow is Sandbox-only and does not establish production eligibility or legal approval.
 
-The platform fee (3%, configured in `lib/config.js` and `lib/fees.js`) is calculated as a buyer-facing line item during invoice creation and checkout. The buyer pays `agreed_price + platform_fee`, allowing the platform to retain its fee while disbursing the agreed item price to the seller upon return-window close. There is no special PayPal fee-splitting feature in use here.
+The platform fee is 3%, calculated in integer cents. Provider processing and payout fees are recorded separately; they may exceed the platform fee. No PayPal fee-splitting feature is used.
 
 ---
 
 ## 7. AI Agent Design
 
-Two agents are used, both running on Gemini via the Vercel AI SDK:
+AI negotiation is planned but not implemented in this transaction flow. The Gemini and Agent Toolkit dependencies are not used by the payment operations.
 
-**Buyer Agent**
-- System prompt represents the buyer's stated budget and conditions.
-- Tool access limited to: `orders.create`, `orders.get`, `orders.capture`.
-- Cannot create invoices or trigger payouts.
-
-**Seller Agent**
-- System prompt represents the seller's price floor and conditions.
-- Tool access limited to: `invoices.create`, `invoices.send`, `payouts.create`.
-- Cannot capture a buyer's payment directly.
-
-This split is deliberate, not incidental. Each agent can only take the actions that make sense for the party it represents. A judge inspecting the code should be able to see the tool scoping directly in the agent configuration, rather than taking a description of it on faith.
-
-**Negotiation loop:** when "AI Negotiate" mode is selected, the two agents exchange offers for a fixed maximum number of rounds (configurable, set to 5 by default). If no agreement is reached by the final round, each agent is prompted to produce a final offer, and the deal is marked as unresolved rather than left open-ended. This cap exists both to keep the demo predictable and to avoid unbounded API usage against Gemini's free tier.
+No AI agent can create orders, capture payments, issue refunds, or trigger payouts. Server routes authorize these actions and verify provider responses.
 
 ---
 
@@ -150,7 +136,8 @@ This split is deliberate, not incidental. Each agent can only take the actions t
 | `listings` | `id`, `seller_id`, `title`, `description`, `price` |
 | `deals` | `id`, `listing_id`, `buyer_id`, `seller_id`, `status`, `agreed_price`, `platform_fee`, `negotiation_mode` |
 | `messages` | `id`, `deal_id`, `sender` (`buyer` \| `seller` \| `buyer_agent` \| `seller_agent`), `text`, `is_ai_generated` |
-| `invoices` | `id`, `deal_id`, `paypal_invoice_id`, `status` |
+| `deal_agreements` | Versioned immutable terms, hash, and buyer/seller acceptance records |
+| `invoices` | Internal invoice amount, status, expiry, and accepted-terms snapshot |
 | `payouts` | `id`, `deal_id`, `amount`, `platform_fee`, `status`, `released_at` |
 
 `deals.status` moves through: `negotiating → agreed → invoiced → paid → shipped → return_window → released` (or `disputed`, where implemented).
@@ -164,9 +151,8 @@ This split is deliberate, not incidental. Each agent can only take the actions t
 | Frontend | Next.js (App Router), React, Tailwind CSS | Fast to build, deploys cleanly to Vercel for a hosted demo. |
 | Backend | Next.js API routes | Keeps frontend and backend in one deployable project for a hackathon timeline. |
 | Auth & Database | Supabase | Managed auth and Postgres without building custom auth from scratch. |
-| AI model | Google Gemini (`gemini-1.5-flash` / `gemini-2.0-flash`) | Supports tool/function calling, usable on a free tier. |
-| AI orchestration | Vercel AI SDK | Model-agnostic tool-calling layer; integrates with PayPal's Agent Toolkit. |
-| Payments | PayPal Sandbox, via `@paypal/agent-toolkit` | The hackathon's required integration; toolkit exposes PayPal's REST APIs as agent-callable tools. |
+| AI model | Google Gemini packages are present; AI negotiation is not implemented in this transaction flow. |
+| Payments | PayPal Sandbox native REST calls | Server-side Orders, capture, refund, Payouts, and webhook verification; Agent Toolkit is not used. |
 | Deployment | Vercel or Render | Free-tier hosting suitable for a judge-accessible demo URL. |
 
 ---
@@ -271,9 +257,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 ```bash
-# 4. Apply the database schema
-#    Run supabase/schema.sql in the Supabase SQL editor, or:
-npm run db:migrate
+# 4. Apply the database migrations manually to a staging Supabase project.
+#    Follow SUPABASE_SETUP.md; this repository has no db:migrate command.
 
 # 5. Start the app
 npm run dev
@@ -287,10 +272,10 @@ The app will be available at `http://localhost:3000`.
 
 1. Create two accounts — one as a seller, one as a buyer — using two separate browser sessions (or one normal, one incognito).
 2. As the seller, create a listing.
-3. As the buyer, open that listing and start a deal. Choose either **Self Chat** or **AI Negotiate**.
-4. Let the negotiation reach agreement, or negotiate manually if using self-chat mode.
-5. As the seller, approve the agreed terms. This triggers invoice creation.
-6. As the buyer, review the invoice, agree to the terms, and complete payment using a [PayPal Sandbox buyer test account](https://developer.paypal.com/dashboard/accounts).
+3. As the buyer, open that listing and start a deal. Discuss terms manually; AI negotiation is not implemented.
+4. As the seller, propose the final price and transaction terms.
+5. Buyer and seller each explicitly accept the same terms version. A changed proposal clears prior acceptances.
+6. The seller issues the internal invoice, then the buyer approves PayPal Checkout using a [PayPal Sandbox buyer test account](https://developer.paypal.com/dashboard/accounts).
 7. As the seller, mark the deal as shipped.
 8. As the buyer, confirm the item was received.
 9. Wait for the return-window countdown to finish.
@@ -303,10 +288,10 @@ The app will be available at `http://localhost:3000`.
 This section is included deliberately, because a hackathon judge evaluating "genuine effort and a working, non-trivial implementation" should know exactly what is real and what is simulated.
 
 - **Marketplace browsing is intentionally minimal.** Listings are seeded demo data. There is no search, filtering, image upload, or category system. The project's focus is the negotiation and payment engine, not a general marketplace.
-- **Escrow is simulated by the platform, not provided by PayPal.** PayPal has no native "hold funds" feature used here; the hold-then-release behavior is application logic sitting on top of PayPal's Orders and Payouts APIs.
-- **The return window is shortened for demonstration purposes.** It is a fixed, short countdown rather than a realistic multi-day window, and is labeled as such in the UI.
-- **AI negotiation is bounded, not open-ended.** The negotiation loop is capped at a fixed number of rounds to keep behavior predictable within a demo and within free-tier API limits, not because unbounded negotiation is technically infeasible.
-- **Dispute resolution, if present, is a best-effort mediation suggestion**, not a binding resolution system — final release decisions in this prototype are automated based on the return-window condition only.
+- **Application-managed hold.** Funds are collected by the platform account in Sandbox; this is not PayPal-native escrow or delayed disbursement and production operation has not been approved.
+- **Return window.** The default is 24 hours after buyer-confirmed or admin-verified delivery. Seller tracking alone never starts the window; unconfirmed delivery is flagged for admin review after seven days.
+- **AI negotiation.** Planned separately and not implemented in the transaction flow.
+- **Disputes and refunds.** Admin-controlled application workflows; provider responses are verified before a refund is considered complete.
 
 ---
 
@@ -318,9 +303,9 @@ This project was created new for the PayPal AI Hackathon submission period. [If 
 
 ## 15. Hackathon Category Alignment
 
-This project is submitted primarily under **Agentic Commerce**: the core mechanic is two AI agents, each scoped to a distinct set of real PayPal actions, negotiating and executing a transaction on behalf of their respective users — not simply recommending one.
+This project explores **Agentic Commerce**. The current transaction flow is server-driven; AI negotiation and agent-scoped PayPal actions are not implemented.
 
-It also touches the **AI Agents or Automation** inspiration category directly, matching the hackathon's own example of "two agents negotiating and settling a payment between themselves."
+Production eligibility, payment model availability, and applicable legal requirements remain to be confirmed before any Live processing.
 
 ---
 

@@ -4,17 +4,16 @@ import type { Database } from "@/types/database.types";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireUser, errorResponse } from "@/lib/auth/server";
 import { loadDealForMember } from "@/lib/deals/access";
-import {
-  findClientTransition,
-  DEMO_PAYMENT_SIMULATION_ENABLED,
-} from "@/lib/deals/transitions";
-import { releaseIfDue } from "@/lib/deals/release";
-import { getDealAmounts } from "@/lib/fees";
+import { findClientTransition } from "@/lib/deals/transitions";
+import { assertSameOrigin, apiError } from "@/lib/payments/http";
+import { db, rpc } from "@/lib/payments/db";
+import { loadPaymentContext } from "@/lib/payments/dealview";
 
-// Strict allow-list: clients cannot set price, fee, terms, released/return_window.
+// Strict allow-list: clients cannot set price, fee, terms, or financial lifecycle states.
+// (invoiced = POST /invoice, paid = verified capture, return_window = confirm-receipt/admin, released = server rules.)
 const patchSchema = z
   .object({
-    status: z.enum(["agreed", "invoiced", "paid", "shipped"]),
+    status: z.literal("shipped"),
     tracking_number: z
       .string()
       .trim()
@@ -36,8 +35,8 @@ export async function GET(
   try {
     const user = await requireUser();
     const { id } = await params;
-    await loadDealForMember(id, user);
-    await releaseIfDue(id);
+    const { side } = await loadDealForMember(id, user);
+    // READ-ONLY: GET never changes state or moves money (release happens via POST/scheduler).
 
     const { data: deal, error: dealError } = await supabaseAdmin
       .from("deals")
@@ -53,46 +52,35 @@ export async function GET(
       );
     }
 
-    const [
-      { data: messages, error: messagesError },
-      { data: invoices, error: invoicesError },
-      { data: payouts, error: payoutsError },
-    ] = await Promise.all([
-      supabaseAdmin
-        .from("messages")
-        .select("*")
-        .eq("deal_id", id)
-        .order("created_at", { ascending: true }),
-
-      supabaseAdmin
-        .from("invoices")
-        .select("*")
-        .eq("deal_id", id)
-        .order("created_at", { ascending: false })
-        .limit(1),
-
-      supabaseAdmin.from("payouts").select("*").eq("deal_id", id).limit(1),
+    const [{ data: messages, error: messagesError }, payment] = await Promise.all([
+      supabaseAdmin.from("messages").select("*").eq("deal_id", id).order("created_at", { ascending: true }),
+      loadPaymentContext(id, side),
     ]);
-
-    if (messagesError || invoicesError || payoutsError) {
-      console.error("[deals] GET related data lookup failed:", {
-        messages: messagesError?.message,
-        invoices: invoicesError?.message,
-        payouts: payoutsError?.message,
-      });
-
-      return NextResponse.json(
-        { error: "Failed to load deal details" },
-        { status: 500 },
-      );
+    if (messagesError) {
+      console.error("[deals] GET messages lookup failed:", messagesError.message);
+      return NextResponse.json({ error: "Failed to load deal details" }, { status: 500 });
     }
+    const { data: agreement } = await db.from("deal_agreements").select("version,terms_hash,terms,buyer_accepted_at,seller_accepted_at,buyer_accepted_hash,seller_accepted_hash").eq("deal_id", id).maybeSingle();
 
+    // Internal review flags are not for clients.
+    const { needs_review: _nr, review_reason: _rr, ...safeDeal } = deal as Record<string, unknown>;
+    void _nr; void _rr;
     return NextResponse.json({
-      deal,
+      deal: safeDeal,
       listing: deal.listing ?? null,
       messages: messages ?? [],
-      invoice: invoices?.[0] ?? null,
-      payout: payouts?.[0] ?? null,
+      invoice: payment.invoice,
+      payout: payment.payout,
+      financials: payment.financials,
+      events: payment.events,
+      dispute: payment.dispute,
+      agreement: agreement ? {
+        version: agreement.version,
+        termsHash: agreement.terms_hash,
+        terms: agreement.terms,
+        buyerAccepted: agreement.buyer_accepted_hash === agreement.terms_hash,
+        sellerAccepted: agreement.seller_accepted_hash === agreement.terms_hash,
+      } : null,
     });
   } catch (err) {
     return errorResponse(err);
@@ -104,6 +92,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    assertSameOrigin(request);
     const user = await requireUser();
     const { id } = await params;
     const parsed = patchSchema.safeParse(
@@ -120,47 +109,15 @@ export async function PATCH(
     type DealUpdate = Database["public"]["Tables"]["deals"]["Update"];
     const updates: DealUpdate = { status: to };
 
-    if (to === "paid") {
-      // Real capture arrives in Stage 3. Until then only a dev-only, buyer-only simulation exists.
-      if (!DEMO_PAYMENT_SIMULATION_ENABLED) {
-        return NextResponse.json(
-          {
-            error:
-              "Payment can only be confirmed by verified PayPal capture (not yet implemented)",
-          },
-          { status: 403 },
-        );
-      }
-      if (side !== 'buyer' || deal.status !== 'invoiced') {
-        return NextResponse.json(
-          { error: "Transition invoiced -> paid is not allowed" },
-          { status: 409 },
-        );
-      }
-    } else {
-      const t = findClientTransition(deal.status, to, side);
-      if (!t.ok)
-        return NextResponse.json({ error: t.error }, { status: t.code });
-    }
+    const t = findClientTransition(deal.status, to, side);
+    if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.code });
 
-    if (to === "agreed" || to === "invoiced") {
-      // Price/fee come from trusted DB values only.
-      const price = Number(deal.agreed_price ?? deal.listing?.price ?? 0);
-      if (!(price > 0))
-        return NextResponse.json(
-          { error: "No valid price on this deal" },
-          { status: 409 },
-        );
-      updates.agreed_price = price;
-      updates.platform_fee = getDealAmounts(price).fee;
-    }
     if (to === "shipped") {
-      if (!tracking_number)
-        return NextResponse.json(
-          { error: "tracking_number is required" },
-          { status: 400 },
-        );
-      updates.tracking_number = tracking_number;
+      if (!tracking_number) return NextResponse.json({ error: "tracking_number is required" }, { status: 400 });
+      // Atomic + server clock; also requires a verified captured payment. Shipping alone never starts the return window.
+      await rpc("fn_mark_shipped", { p_deal_id: id, p_seller_id: user.id, p_tracking: tracking_number });
+      const { data: shipped } = await supabaseAdmin.from("deals").select(SAFE_SELECT).eq("id", id).single();
+      return NextResponse.json(shipped);
     }
 
     // Conditional update = optimistic concurrency; a stale/double request affects 0 rows.
@@ -182,6 +139,6 @@ export async function PATCH(
       );
     return NextResponse.json(rows[0]);
   } catch (err) {
-    return errorResponse(err);
+    return apiError(err);
   }
 }
