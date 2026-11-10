@@ -54,6 +54,10 @@ export function DealWorkspace({
   const [accepted, setAccepted] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState("");
+  // Bumped on every "Reset simulation" click so the stage panel (and the
+  // CountdownRing inside it) always remounts, even when the reset puts
+  // status/startedAt back to values that happen to be unchanged.
+  const [resetNonce, setResetNonce] = useState(0);
   const status = currentDeal.status;
   const index = DEAL_STATUS_ORDER.indexOf(status);
 
@@ -169,6 +173,7 @@ export function DealWorkspace({
           </GlassCard>
           <GlassCard hover={false} className="p-6 md:p-8">
             <StagePanel
+              key={resetNonce}
               status={status}
               role={role}
               deal={currentDeal}
@@ -339,6 +344,7 @@ export function DealWorkspace({
                   setCurrentDeal(deal);
                   setAccepted(false);
                   setError("");
+                  setResetNonce((n) => n + 1);
                 }}
                 disabled={isPending}
               >
