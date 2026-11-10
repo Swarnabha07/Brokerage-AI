@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test tests/unit/payments.test.mjs",
+    "test:db": "node --test tests/db/db.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.111",

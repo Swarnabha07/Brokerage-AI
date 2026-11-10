@@ -1,18 +1,21 @@
 import type { Role } from '@/lib/auth/server';
 
 export type DealStatus =
-  | 'negotiating' | 'agreed' | 'invoiced' | 'paid' | 'shipped' | 'return_window' | 'released' | 'disputed';
+  | 'negotiating' | 'agreed' | 'invoiced' | 'paid' | 'shipped' | 'return_window' | 'released' | 'disputed'
+  | 'cancelled' | 'refunded';
 
 /**
  * Client-requestable transitions via PATCH /api/deals/[id]. Anything not listed is rejected.
- * NOT client-requestable (server-only paths):
- *   invoiced -> paid        : PayPal capture verification (Stage 3). Dev-only simulation flag below.
- *   shipped  -> return_window: POST /confirm-receipt (server stamps the start time)
- *   return_window -> released: releaseIfDue() after server-side elapsed-time check
+ * Dedicated, verified server paths (never a plain status PATCH):
+ *   agreed   -> invoiced      : POST /invoice (seller, final price frozen in an immutable invoice)
+ *   invoiced -> paid          : POST /payments/capture after PayPal-verified capture (fn_record_capture)
+ *   paid     -> shipped       : PATCH status=shipped (seller) -> fn_mark_shipped
+ *   shipped  -> return_window : POST /confirm-receipt (buyer) or admin delivery verification
+ *   return_window -> released : fn_evaluate_release (scheduled job or "Check release"), server clock only
+ *   *        -> disputed/cancelled/refunded : /dispute, /cancel, admin actions
  */
 export const CLIENT_TRANSITIONS: Record<string, { to: DealStatus; roles: Role[] }[]> = {
   negotiating: [{ to: 'agreed', roles: ['buyer', 'seller'] }],
-  agreed: [{ to: 'invoiced', roles: ['seller'] }],
   paid: [{ to: 'shipped', roles: ['seller'] }],
 };
 
@@ -22,7 +25,3 @@ export function findClientTransition(from: string | null, to: string, role: Role
   if (!rule.roles.includes(role)) return { ok: false as const, code: 403, error: `Only the ${rule.roles.join('/')} can do this` };
   return { ok: true as const };
 }
-
-/** Dev-only escape hatch until PayPal Sandbox (Stage 3). Never active in production. */
-export const DEMO_PAYMENT_SIMULATION_ENABLED =
-  process.env.NODE_ENV !== 'production' && process.env.DEMO_SIMULATE_PAYMENT === 'true';

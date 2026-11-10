@@ -13,6 +13,8 @@ import { getSellerDashboard } from "@/lib/api/deals";
 import { redirect } from "next/navigation";
 import { getVerifiedUser } from "@/lib/auth/server";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { PayoutProfileCard } from "@/components/features/dashboard/PayoutProfileCard";
+import { db } from "@/lib/payments/db";
 
 export const metadata = { title: "Seller dashboard" };
 
@@ -22,23 +24,33 @@ export default async function SellerDashboardPage() {
   if (user.role !== "seller") redirect("/buyer/dashboard");
   const { viewer, stats, listings, activeDeals, payouts } =
     await getSellerDashboard(user);
+  const { data: payoutProfile } = await db
+    .from("seller_payout_profiles")
+    .select("paypal_email")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   const columns = [
     { key: "title", header: "Item" },
     {
       key: "date",
       header: "Date",
-      render: (r) => (r.payoutStatus === "released" ? formatDate(r.date) : "—"),
+      render: (r) => (r.payoutStatus === "paid" ? formatDate(r.date) : "—"),
     },
     {
       key: "status",
       header: "Status",
-      render: (r) =>
-        r.payoutStatus === "released" ? (
-          <Badge variant="success">Released (app ledger)</Badge>
-        ) : (
-          <Badge variant="warning">Pending</Badge>
-        ),
+      render: (r) => {
+        const map = {
+          paid: ["success", "Paid out"],
+          processing: ["warning", "Payout processing"],
+          failed: ["warning", "Payout needs attention"],
+          review: ["warning", "Payout under review"],
+          held: ["warning", "Held by Brokerage AI"],
+        };
+        const [variant, label] = map[r.payoutStatus] ?? map.held;
+        return <Badge variant={variant}>{label}</Badge>;
+      },
     },
     {
       key: "amount",
@@ -84,9 +96,11 @@ export default async function SellerDashboardPage() {
           label="Pending payout"
           value={stats.pendingPayout}
           delay={0.16}
-          note="App-ledger amount; no PayPal payout yet"
+          note="Held by Brokerage AI or processing; PayPal Sandbox"
         />
       </div>
+
+      <PayoutProfileCard initialEmail={payoutProfile?.paypal_email ?? ""} />
 
       <section aria-labelledby="your-listings" className="mb-10">
         <h2

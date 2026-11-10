@@ -1,28 +1,31 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireUser, errorResponse } from '@/lib/auth/server';
+import { requireUser } from '@/lib/auth/server';
 import { loadDealForMember } from '@/lib/deals/access';
+import { assertSameOrigin, apiError, limit } from '@/lib/payments/http';
+import { getPaymentsConfig } from '@/lib/payments/config';
+import { rpc } from '@/lib/payments/db';
 
-/** Buyer-only: shipped -> return_window. The server stamps the window start; the client supplies nothing. */
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+/**
+ * Buyer-only: shipped -> return_window. The buyer's confirmation is the delivery evidence. The server
+ * stamps start and end (database clock) and the client supplies nothing but an optional short note.
+ */
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    assertSameOrigin(req);
     const user = await requireUser('buyer');
     const { id } = await params;
-    const { deal } = await loadDealForMember(id, user);
-    if (deal.buyer_id !== user.id) return NextResponse.json({ error: 'Only the buyer can confirm receipt' }, { status: 403 });
-    if (deal.status !== 'shipped') return NextResponse.json({ error: 'Deal is not in the shipped state' }, { status: 409 });
-
-    const terms = (deal.terms_json && typeof deal.terms_json === 'object' ? deal.terms_json : {}) as Record<string, unknown>;
-    const { data: rows, error } = await supabaseAdmin
-      .from('deals')
-      .update({ status: 'return_window', terms_json: { ...terms, return_window_started_at: new Date().toISOString() } })
-      .eq('id', id)
-      .eq('status', 'shipped')
-      .select('id, status, terms_json');
-    if (error) return NextResponse.json({ error: 'Failed to confirm receipt' }, { status: 500 });
-    if (!rows?.length) return NextResponse.json({ error: 'Deal state changed; refresh and retry' }, { status: 409 });
-    return NextResponse.json(rows[0]);
+    limit(`confirm:${user.id}`, 10, 60_000);
+    await loadDealForMember(id, user);
+    const note = ((await req.json().catch(() => null)) as { note?: unknown } | null)?.note;
+    const deal = await rpc<{ id: string; status: string; return_window_ends_at: string }>('fn_confirm_delivery', {
+      p_deal_id: id,
+      p_actor_id: user.id,
+      p_actor: 'buyer',
+      p_note: typeof note === 'string' ? note.slice(0, 500) : null,
+      p_window_hours: getPaymentsConfig().returnWindowHours,
+    });
+    return NextResponse.json({ id: deal.id, status: deal.status, return_window_ends_at: deal.return_window_ends_at });
   } catch (err) {
-    return errorResponse(err);
+    return apiError(err);
   }
 }

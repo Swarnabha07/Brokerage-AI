@@ -1,17 +1,23 @@
 import { NextResponse } from 'next/server';
-import { requireUser, errorResponse } from '@/lib/auth/server';
+import { requireUser } from '@/lib/auth/server';
 import { loadDealForMember } from '@/lib/deals/access';
-import { releaseIfDue } from '@/lib/deals/release';
+import { assertSameOrigin, apiError, limit } from '@/lib/payments/http';
+import { checkReleaseAndPay } from '@/lib/payments/payouts';
 
-/** Safe to call at any time by a deal member: releases only if the SERVER clock says the window ended. */
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+/**
+ * "Check release": a member can ask the server to evaluate this deal. It applies the SAME rules as the
+ * scheduled job (delivery evidence, server-clock window, no dispute/review flag, verified payment) and pays
+ * only when ALL hold. The caller cannot force, skip or choose anything; repeat calls are harmless.
+ */
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    assertSameOrigin(req);
     const user = await requireUser();
     const { id } = await params;
+    limit(`release:${user.id}:${id}`, 10, 60_000);
     await loadDealForMember(id, user);
-    const result = await releaseIfDue(id);
-    return NextResponse.json(result);
+    return NextResponse.json(await checkReleaseAndPay(id));
   } catch (err) {
-    return errorResponse(err);
+    return apiError(err);
   }
 }

@@ -9,12 +9,13 @@ import {
   Truck,
   Loader2,
 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChatBubble } from "@/components/features/deal/ChatBubble";
 import { CountdownRing } from "@/components/features/deal/CountdownRing";
 import { formatCurrency } from "@/lib/format";
-import { FEE_RATE_LABEL } from "@/lib/fees";
+import { FEE_RATE_LABEL, getDealAmounts } from "@/lib/fees";
 
 function PanelTitle({ children, simulated = true }) {
   return (
@@ -80,12 +81,21 @@ export function StagePanel({
   accepted,
   onAccept,
   onAdvance,
+  onProposeTerms,
+  onAcceptTerms,
   onWindowEnd,
   returnWindowSeconds,
   isLive = false,
   isPending = false,
 }) {
   const { amounts } = deal;
+  const [finalPrice, setFinalPrice] = useState(String(deal.price ?? ""));
+  const [fulfillmentType, setFulfillmentType] = useState(deal.agreement?.terms?.fulfillment_type ?? "");
+  const [deliveryExpectations, setDeliveryExpectations] = useState(deal.agreement?.terms?.delivery_expectations ?? "");
+  const [transactionConditions, setTransactionConditions] = useState(deal.agreement?.terms?.transaction_conditions ?? "");
+  const agreementAmounts = deal.agreement?.terms?.price_cents
+    ? getDealAmounts(deal.agreement.terms.price_cents / 100)
+    : null;
 
   if (status === "negotiating") {
     return (
@@ -101,7 +111,44 @@ export function StagePanel({
             <ChatBubble key={m.id} sender={m.sender} text={m.text} />
           ))}
         </ul>
-        {role === "buyer" || role === "seller" ? (
+        {isLive ? (
+          <div className="space-y-4">
+            {role === "seller" && (
+              <div className="space-y-2">
+                <label className="block text-sm" htmlFor="mutual-final-price">Final price (USD)</label>
+                <input id="mutual-final-price" className="w-full rounded-lg border border-border bg-background px-3 py-2" inputMode="decimal" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} />
+                <label className="block text-sm" htmlFor="fulfillment-type">Fulfillment type</label>
+                <select id="fulfillment-type" className="w-full rounded-lg border border-border bg-background px-3 py-2" value={fulfillmentType} onChange={(e) => setFulfillmentType(e.target.value)}>
+                  <option value="" disabled>Choose a fulfillment type</option>
+                  <option value="physical_goods">Physical goods</option>
+                  <option value="service">Service</option>
+                  <option value="other">Other</option>
+                </select>
+                <label className="block text-sm" htmlFor="delivery-expectations">Delivery or service expectations</label>
+                <textarea id="delivery-expectations" className="w-full rounded-lg border border-border bg-background px-3 py-2" rows={3} maxLength={2000} value={deliveryExpectations} onChange={(e) => setDeliveryExpectations(e.target.value)} placeholder="For example: tracked shipping, local pickup, or the service deliverable and due date" />
+                <label className="block text-sm" htmlFor="transaction-conditions">Other transaction conditions (optional)</label>
+                <textarea id="transaction-conditions" className="w-full rounded-lg border border-border bg-background px-3 py-2" rows={2} maxLength={2000} value={transactionConditions} onChange={(e) => setTransactionConditions(e.target.value)} />
+                <Button onClick={() => onProposeTerms(finalPrice, { fulfillmentType, deliveryExpectations, transactionConditions })} disabled={isPending || !fulfillmentType || deliveryExpectations.trim().length < 3}>{deal.agreement ? "Update terms (resets both acceptances)" : "Propose terms"}</Button>
+              </div>
+            )}
+            {deal.agreement ? (
+              <div className="space-y-3 rounded-xl border border-border p-4 text-sm">
+                <p className="font-medium">Version {deal.agreement.version}: {formatCurrency((deal.agreement.terms?.price_cents ?? 0) / 100)}</p>
+                {agreementAmounts && <dl className="space-y-1 border-y border-border py-2"><Row label={`Buyer-paid platform fee (${FEE_RATE_LABEL})`} value={formatCurrency(agreementAmounts.fee)} /><Row label="Buyer total" value={formatCurrency(agreementAmounts.buyerTotal)} strong /><Row label="Seller receives before provider fees" value={formatCurrency(agreementAmounts.sellerAmount)} /></dl>}
+                <p><strong>Listing:</strong> {deal.agreement.terms?.title}: {deal.agreement.terms?.description}</p>
+                <p><strong>Fulfillment:</strong> {deal.agreement.terms?.fulfillment_type?.replaceAll("_", " ")}</p>
+                <p><strong>Delivery / service:</strong> {deal.agreement.terms?.delivery_expectations}</p>
+                {deal.agreement.terms?.buyer_conditions && <p><strong>Buyer conditions:</strong> {deal.agreement.terms.buyer_conditions}</p>}
+                {deal.agreement.terms?.transaction_conditions && <p><strong>Other conditions:</strong> {deal.agreement.terms.transaction_conditions}</p>}
+                {Object.keys(deal.agreement.terms?.conditions ?? {}).length > 0 && <p><strong>Recorded conditions:</strong> {JSON.stringify(deal.agreement.terms.conditions)}</p>}
+                <p>Return window: {deal.agreement.terms?.return_window_hours} hours</p>
+                <p className="text-muted-foreground">{deal.agreement.terms?.return_window_policy}</p>
+                <p>Accepted: buyer {deal.agreement.buyerAccepted ? "✓" : "—"}; seller {deal.agreement.sellerAccepted ? "✓" : "—"}</p>
+                <Button onClick={onAcceptTerms} disabled={isPending}>{deal.agreement[`${role}Accepted`] ? "Accepted current terms" : "Accept these terms"}</Button>
+              </div>
+            ) : <Waiting>Seller must propose the final price and transaction terms first.</Waiting>}
+          </div>
+        ) : role === "buyer" || role === "seller" ? (
           <Button onClick={() => onAdvance("agreed")} disabled={isPending}>
             {isPending ? (
               <span className="flex items-center gap-2">

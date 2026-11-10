@@ -2,13 +2,13 @@
 
 <!-- ═══════════════ ANIMATED HERO ═══════════════ -->
 
-<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:020617,20:312E81,45:4F46E5,70:7C3AED,100:0070BA&height=250&section=header&text=Brokerage%20AI&fontSize=66&fontColor=ffffff&fontAlignY=35&animation=twinkling&desc=AI-Negotiated,%20PayPal-Powered%20Escrow%20for%20Peer-to-Peer%20Deals&descAlignY=57&descSize=17" />
+<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:020617,20:312E81,45:4F46E5,70:7C3AED,100:0070BA&height=250&section=header&text=Brokerage%20AI&fontSize=66&fontColor=ffffff&fontAlignY=35&animation=twinkling&desc=PayPal%20Sandbox%20Checkout%20for%20Peer-to-Peer%20Deals&descAlignY=57&descSize=17" />
 
 <br>
 
 <!-- ═══════════════ TYPING ANIMATION ═══════════════ -->
 
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=21&duration=2500&pause=800&color=818CF8&center=true&vCenter=true&repeat=true&width=750&height=55&lines=Two+AI+agents+negotiate+your+deal...;PayPal+holds+the+trust...;You+just+confirm." alt="Brokerage AI Typing Animation" />
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=21&duration=2500&pause=800&color=818CF8&center=true&vCenter=true&repeat=true&width=750&height=55&lines=Both+parties+accept+the+terms...;PayPal+Sandbox+checkout...;The+app+tracks+release+conditions." alt="Brokerage AI transaction flow" />
 
 <br><br>
 
@@ -80,17 +80,19 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 
 ## ✨ The Idea
 
-**Brokerage AI** gives every deal its own AI negotiator and a built-in safety net.
+**Brokerage AI** is a peer-to-peer marketplace prototype with a structured, application-managed transaction flow. AI negotiation remains planned work.
 
-> 🤖 Buyer and Seller each get an **AI agent** that can negotiate price and terms on their behalf — or they can chat themselves
+> 🤖 Buyers and sellers can discuss terms; AI negotiation is not implemented in this transaction branch
 >
-> 🧾 Once both sides agree, the platform generates a **real PayPal invoice**
+> 🧾 Once both sides accept the same terms, the platform creates an internal Brokerage AI invoice
 >
-> 💳 The buyer pays through an **on-site checkout** — funds are held by the platform
+> 💳 The buyer pays through PayPal Checkout in Sandbox; the application tracks an application-managed hold
 >
 > 📦 The seller ships, the buyer confirms, a **return window** runs
 >
 > 💸 When it closes, **PayPal Payouts** releases the agreed funds to the seller, with the transparent 3% platform fee retained by the platform
+
+PayPal Checkout does not collect or verify shipping addresses or delivery. Physical-goods delivery and service fulfillment expectations are recorded in terms accepted by both parties; tracking references are not carrier-verified.
 
 <br>
 
@@ -102,7 +104,7 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 
 ### 🔐 No blind trust. No manual back-and-forth.
 
-**Just a deal, negotiated and settled end-to-end.**
+**A structured transaction with server-verified payment and release.**
 
 <br>
 
@@ -158,33 +160,33 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 <table width="100%">
 <tr>
 <td width="60" align="center">🤖</td>
-<td width="220"><b>Dual AI Negotiation</b></td>
-<td>Buyer and Seller each get a Gemini-powered AI agent that can negotiate price and terms autonomously, capped at 5 rounds</td>
+<td width="220"><b>Mutual terms acceptance</b></td>
+<td>Buyer and seller accept the same versioned transaction terms before an invoice is issued</td>
 </tr>
 <tr>
 <td align="center">💬</td>
-<td><b>Self-Chat or AI Mode</b></td>
-<td>Buyer chooses between chatting directly with the Seller's AI, or letting their own AI negotiate on their behalf</td>
+<td><b>AI negotiation (planned)</b></td>
+<td>AI negotiation is planned separately and is not part of this transaction implementation</td>
 </tr>
 <tr>
 <td align="center">📝</td>
-<td><b>AI-Drafted Terms</b></td>
-<td>Once agreement is reached, AI extracts a structured, plain-language terms summary automatically</td>
+<td><b>Immutable terms snapshot</b></td>
+<td>Changing the proposed terms resets both parties' acceptances</td>
 </tr>
 <tr>
 <td align="center">🧾</td>
-<td><b>Real PayPal Invoicing</b></td>
-<td>Seller's AI agent generates and sends an actual PayPal sandbox invoice once terms are approved</td>
+<td><b>Internal invoice</b></td>
+<td>Brokerage AI records the invoice; payment uses PayPal Checkout, not PayPal Invoicing API</td>
 </tr>
 <tr>
 <td align="center">💳</td>
 <td><b>On-Site Checkout</b></td>
-<td>Buyer pays without ever leaving the platform, via the PayPal Orders API</td>
+<td>Buyer approves a PayPal Checkout order; this integration is Sandbox-only</td>
 </tr>
 <tr>
 <td align="center">🔒</td>
-<td><b>Simulated Escrow</b></td>
-<td>Funds are held by the platform after payment, released only after delivery + return window</td>
+<td><b>Application-managed hold</b></td>
+<td>The app tracks release eligibility; this is not PayPal-native escrow or delayed disbursement</td>
 </tr>
 <tr>
 <td align="center">📦</td>
@@ -203,8 +205,8 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 </tr>
 <tr>
 <td align="center">🎯</td>
-<td><b>Scoped Agent Permissions</b></td>
-<td>Each AI agent only has access to the PayPal tools relevant to its role — buyer agents can't create payouts, seller agents can't capture orders</td>
+<td><b>Server-side financial controls</b></td>
+<td>Payment, refund and payout operations are authorized and verified on the server</td>
 </tr>
 </table>
 
@@ -219,7 +221,7 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 
 <img width="900" height="610" alt="Neon AI Marketplace Architecture Flow" src="https://github.com/user-attachments/assets/cb151053-8dd1-412c-a0bb-e5732f8ac947" />
 
-> Each AI agent holds a **scoped subset** of PayPal's Agent Toolkit tools — **Buyer Agent** → `orders: { create, get, capture }` · **Seller Agent** → `invoices: { create, send }`, `payouts: { create }`. Neither agent can act outside its role.
+> The server uses native PayPal REST calls in Sandbox. No PayPal Agent Toolkit tools are currently wired to agents.
 
 <br>
 
@@ -238,9 +240,9 @@ Peer-to-peer deals — a stranger buying your bike, a freelancer gig, a marketpl
 | **Frontend** | Next.js (App Router), React, Tailwind CSS, Framer Motion |
 | **Backend** | Next.js API Routes (Node.js) |
 | **Auth & Database** | Supabase (Auth + Postgres) |
-| **AI Model** | Google Gemini (`gemini-1.5-flash` / `gemini-2.0-flash`) |
-| **AI Orchestration** | Vercel AI SDK (`ai`, `@ai-sdk/google`) |
-| **Payments** | PayPal Sandbox — Orders, Invoicing & Payouts APIs via `@paypal/agent-toolkit` |
+| **AI Model** | Gemini integration is planned; not used by the transaction flow |
+| **AI Orchestration** | Vercel AI SDK packages are installed but no negotiation agents are implemented |
+| **Payments** | PayPal Sandbox Checkout, server-side capture/refund verification, and Payouts via native REST calls |
 | **Deployment** | Vercel / Render |
 
 </div>
@@ -344,9 +346,9 @@ Visit `http://localhost:3000`
 <img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:0070BA,100:4F46E5&height=120&section=header&text=Built%20for%20Agentic%20Commerce&fontSize=28&fontColor=ffffff&fontAlignY=55" />
 </div>
 
-Built for the **[PayPal AI Hackathon](https://paypalaihackathon.devpost.com/)** — integrating the PayPal Developer Platform (Sandbox) with Google Gemini as the AI layer.
+Built for the **[PayPal AI Hackathon](https://paypalaihackathon.devpost.com/)**. Payment actions use PayPal Sandbox through native server-side REST calls.
 
-This project centers on **agentic commerce**: AI agents don't just recommend a deal, they negotiate it and execute real PayPal actions — invoicing, checkout, and payouts — on behalf of their user, within clearly scoped permission boundaries.
+The current transaction flow uses server-authorized PayPal Checkout, verified captures, and PayPal Payouts. AI negotiation and agent-scoped PayPal tools are not implemented. Production eligibility and legal approval have not been established.
 
 <br>
 

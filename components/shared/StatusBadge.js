@@ -6,6 +6,8 @@ import {
   ShieldCheck,
   Truck,
   CreditCard,
+  AlertTriangle,
+  XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DEAL_STATUS_META } from "@/lib/constants/deal-status";
@@ -18,6 +20,9 @@ const visuals = {
   shipped: { variant: "warning", Icon: Truck },
   return_window: { variant: "warning", Icon: Clock },
   released: { variant: "success", Icon: PackageCheck },
+  disputed: { variant: "warning", Icon: AlertTriangle },
+  cancelled: { variant: "default", Icon: XCircle },
+  refunded: { variant: "default", Icon: XCircle },
 };
 
 export function StatusBadge({ status }) {
