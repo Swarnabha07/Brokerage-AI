@@ -51,7 +51,7 @@ export function CountdownRing({ totalSeconds = 60, startedAt, onComplete }) {
     <div
       className="relative mx-auto h-36 w-36"
       role="timer"
-      aria-label={`${left} seconds left in the 60-second simulated return window`}
+      aria-label={`${left} seconds left in the ${totalSeconds}-second simulated return window`}
     >
       <svg viewBox="0 0 120 120" className="-rotate-90" aria-hidden="true">
         <circle
