@@ -2,6 +2,6 @@
 
 import { ErrorState } from "@/components/shared/ErrorState";
 
-export default function Error({ retry }) {
-  return <ErrorState onRetry={retry} />;
+export default function Error({ error, reset }) {
+  return <ErrorState onRetry={reset} />;
 }
