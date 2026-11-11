@@ -22,6 +22,12 @@ export function Footer() {
               {link.label}
             </Link>
           ))}
+          <Link href="/terms-and-conditions" className="hover:text-foreground">
+            Terms &amp; Conditions
+          </Link>
+          <Link href="/privacy-policy" className="hover:text-foreground">
+            Privacy Policy
+          </Link>
           <Link href="/login" className="hover:text-foreground">
             Log in
           </Link>
