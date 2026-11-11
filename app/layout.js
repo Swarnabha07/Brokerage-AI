@@ -23,6 +23,9 @@ export const metadata = {
   },
   description:
     "A frontend demo of Brokerage AI: AI agents help buyers and sellers negotiate structured deals. Sample data only; no real payments are processed.",
+  verification: {
+    google: "mioFZQSqhQik8ZlBaCq4Xb8d0X0CUMb4jrJBDYyOxac",
+  },
 };
 
 export default function RootLayout({ children }) {
