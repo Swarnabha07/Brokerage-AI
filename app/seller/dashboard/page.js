@@ -15,7 +15,10 @@ import { getVerifiedUser } from "@/lib/auth/server";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { PayoutProfileCard } from "@/components/features/dashboard/PayoutProfileCard";
 import { db } from "@/lib/payments/db";
-
+import { connection } from "next/server";
+export const metadata = { title: "Seller dashboard" };
+export default async function SellerDashboardPage(/* existing args */) {
+  await connection();
 export const metadata = { title: "Seller dashboard" };
 
 export default async function SellerDashboardPage() {
