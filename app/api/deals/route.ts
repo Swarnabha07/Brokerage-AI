@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireUser, errorResponse } from "@/lib/auth/server";
-
+import { assertSameOrigin, apiError } from "@/lib/payments/http";
 // buyer_id/seller_id are never accepted from the client.
 const createDealSchema = z
   .object({
@@ -17,6 +17,7 @@ const createDealSchema = z
 
 export async function POST(request: Request) {
   try {
+    assertSameOrigin(request);
     const user = await requireUser("buyer");
     const parsed = createDealSchema.safeParse(
       await request.json().catch(() => null),
@@ -76,6 +77,6 @@ export async function POST(request: Request) {
       );
     return NextResponse.json(deal, { status: 201 });
   } catch (err) {
-    return errorResponse(err);
+    return apiError(err);
   }
 }
