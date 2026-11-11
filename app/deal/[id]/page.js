@@ -6,6 +6,7 @@ import { DEMO_RETURN_WINDOW_SECONDS } from "@/lib/config";
 import { FEE_RATE_LABEL } from "@/lib/fees";
 
 export const metadata = { title: "Deal" };
+export const dynamic = "force-dynamic";
 
 // Real deals are private and per-user: no generateStaticParams, rendered per request.
 export default async function DealPage({ params, searchParams }) {
