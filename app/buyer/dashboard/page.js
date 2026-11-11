@@ -14,11 +14,9 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { FEE_RATE_LABEL } from "@/lib/fees";
 import { connection } from "next/server";
 export const metadata = { title: "Buyer dashboard" };
-export default async function BuyerDashboardPage(/* existing args */) {
-  await connection();
-export const metadata = { title: "Buyer dashboard" };
 
 export default async function BuyerDashboardPage() {
+  await connection();
   const user = await getVerifiedUser();
   if (!user) redirect("/login");
   if (user.role !== "buyer") redirect("/seller/dashboard");
