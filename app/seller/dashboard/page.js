@@ -17,11 +17,9 @@ import { PayoutProfileCard } from "@/components/features/dashboard/PayoutProfile
 import { db } from "@/lib/payments/db";
 import { connection } from "next/server";
 export const metadata = { title: "Seller dashboard" };
-export default async function SellerDashboardPage(/* existing args */) {
-  await connection();
-export const metadata = { title: "Seller dashboard" };
 
 export default async function SellerDashboardPage() {
+  await connection();
   const user = await getVerifiedUser();
   if (!user) redirect("/login");
   if (user.role !== "seller") redirect("/buyer/dashboard");
