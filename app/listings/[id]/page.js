@@ -1,22 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { ArrowLeft, Store } from "lucide-react";
 import { NegotiationModePicker } from "@/components/features/listings/NegotiationModePicker";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { getAllListingIds, getListingById } from "@/lib/api/listings";
+import { getListingById } from "@/lib/api/listings";
 import { formatCurrency } from "@/lib/format";
 import { FEE_RATE_LABEL } from "@/lib/fees";
 
 export const metadata = { title: "Listing" };
 
-export async function generateStaticParams() {
-  const ids = await getAllListingIds();
-  return ids.map((id) => ({ id }));
-}
-
+// Live listings are fetched per-request: no generateStaticParams.
 export default async function ListingDetailPage({ params }) {
+  await connection();
   const { id } = await params;
   const listing = await getListingById(id);
   if (!listing) notFound();
