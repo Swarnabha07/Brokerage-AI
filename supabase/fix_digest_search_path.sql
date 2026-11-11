@@ -6,11 +6,12 @@
 --
 -- Run this once in the Supabase SQL Editor (production project) to fix it:
 
-ALTER FUNCTION public.fn_issue_invoice(
+ALTER FUNCTION public.fn_propose_terms(
   p_deal_id uuid,
   p_seller_id uuid,
   p_price_cents integer,
-  p_fee_cents integer,
-  p_expiry_hours integer,
-  p_invoice_data jsonb
+  p_return_window_hours numeric,
+  p_fulfillment_type text,
+  p_delivery_expectations text,
+  p_transaction_conditions text
 ) SET search_path = public, extensions;
