@@ -23,7 +23,7 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co https://api.paypal.com https://api-m.sandbox.paypal.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paypal.com https://api-m.sandbox.paypal.com",
       "frame-src 'self' https://www.paypal.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
