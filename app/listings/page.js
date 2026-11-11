@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { connection } from "next/server";
 import { PageHeader } from "@/components/features/dashboard/PageHeader";
 import { ListingCard } from "@/components/features/listings/ListingCard";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -10,6 +11,7 @@ import { getActiveListings } from "@/lib/api/listings";
 export const metadata = { title: "Listings" };
 
 export default async function ListingsPage() {
+  await connection();
   const listings = await getActiveListings();
 
   return (
