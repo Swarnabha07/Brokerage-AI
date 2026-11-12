@@ -2,13 +2,11 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { connection } from "next/server";
-
 import { PageHeader } from "@/components/features/dashboard/PageHeader";
 import { ListingCard } from "@/components/features/listings/ListingCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { buttonVariants } from "@/components/ui/button";
-
 import { getActiveListings } from "@/lib/api/listings";
 import { getVerifiedUser } from "@/lib/auth/server";
 
@@ -22,7 +20,6 @@ export default async function ListingsPage() {
     getVerifiedUser(),
   ]);
 
-  // Only sellers can create listings.
   const canCreateListing = user?.role === "seller";
 
   return (
