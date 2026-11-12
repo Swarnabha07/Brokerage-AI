@@ -139,7 +139,7 @@ PayPal Checkout does not collect or verify shipping addresses or delivery. Physi
 
 | 🔗 Hosted Demo | 🧪 Sandbox Test Accounts |
 |:---:|:---:|
-| [brokerage-ai.vercel.app](https://brokerage-ai.vercel.app/) | [test email and pass: ```sb-jeyzw53798172@personal.example.com``` : ```|qWx.r7/``` |
+| [brokerage-ai.vercel.app](https://brokerage-ai.vercel.app/) | [test email and pass: ```sb-jeyzw53798172@personal.example.com``` : |qWx.r7/] |
 
 </div>
 
