@@ -1,7 +1,7 @@
-// Database integration + concurrency tests for supabase/migrations/001-008.
+// Database integration + concurrency tests for supabase/migrations/001-009.
 // Needs a DISPOSABLE Postgres (never your Supabase project) and the `psql` client:
 //   TEST_DATABASE_URL=postgres://user:pass@localhost:5432/dbname npm run test:db
-// The disposable database must contain tests/db/base_schema.sql and migrations 001-008.
+// The disposable database must contain tests/db/base_schema.sql and migrations 001-009.
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
@@ -34,6 +34,16 @@ async function newDeal({ status = "agreed", profile = true, buyerConditions = ""
     insert into listings (id,seller_id,title,price) values ('${listing}','${seller}','Item',10);
     insert into deals (id,listing_id,buyer_id,seller_id,status,buyer_conditions,terms_json) values ('${deal}','${listing}','${buyer}','${seller}','${status}','${buyerConditions}', '{"conditions":{"existing":"honored"}}');
     ${profile ? `insert into seller_payout_profiles (user_id,paypal_email) values ('${seller}','pay-${seller}@t.test');` : ""}`);
+  return { buyer, seller, listing, deal };
+}
+async function newAiDeal() {
+  const [buyer, seller, listing] = [randomUUID(), randomUUID(), randomUUID()];
+  const requestId = randomUUID();
+  await sql(`insert into users (id,email,role) values ('${buyer}','b-${buyer}@t.test','buyer'),('${seller}','s-${seller}@t.test','seller');
+    insert into listings (id,seller_id,title,price,floor_price) values ('${listing}','${seller}','AI item',10,5);
+    insert into seller_payout_profiles (user_id,paypal_email) values ('${seller}','pay-${seller}@t.test');`);
+  const deal = await sql(`select (fn_create_negotiated_deal('${buyer}','${listing}','ai_negotiate','','${requestId}',true)).id`);
+  await svc(`select fn_neg_start('${deal}','${buyer}',950,100)`);
   return { buyer, seller, listing, deal };
 }
 async function acceptBoth(d, price = 500) {
@@ -392,6 +402,46 @@ describe("database: delivery, return window, release", { skip }, () => {
     assert.ok(Number(await svc(`select fn_flag_stale_shipments(7)`)) >= 1);
     assert.equal(await sql(`select needs_review from deals where id='${d.deal}'`), "t");
     assert.equal(await status(d), "shipped");
+  });
+});
+
+describe("database: AI negotiation privacy, approval and concurrency", { skip }, () => {
+  test("AI proposal RPC bypass is blocked; seller proposal binds exact hash before buyer acceptance and invoice", async () => {
+    const d = await newAiDeal();
+    assert.equal(await sql(`select buyer_budget is null from deals where id='${d.deal}'`), "t");
+    await fails(`select fn_propose_terms('${d.deal}','${d.seller}',600,24,'physical_goods','Tracked shipping; buyer confirms receipt','')`, /brk_neg_approval_required/);
+    await fails(`select fn_accept_terms('${d.deal}','${d.buyer}')`, /brk_neg_seller_approval_required/);
+    await svc(`select fn_neg_seller_propose('${d.deal}','${d.seller}',600,24,'physical_goods','Tracked shipping; buyer confirms receipt','')`);
+    assert.equal(await sql(`select (s.approved_terms_hash=a.terms_hash and a.seller_accepted_hash=a.terms_hash)::text from negotiation_private.sessions s join deal_agreements a using(deal_id) where s.deal_id='${d.deal}'`), "true");
+    await fails(`select fn_issue_invoice('${d.deal}','${d.seller}',600,18,48,'{}')`, /brk_neg_acceptance_required/);
+    await svc(`select fn_accept_terms('${d.deal}','${d.buyer}')`);
+    const invoice = await j(`select to_jsonb(i) from fn_issue_invoice('${d.deal}','${d.seller}',600,18,48,'{}') i`);
+    assert.equal(invoice.price_cents, 600);
+  });
+
+  test("private session is inaccessible to browser roles and direct approval RPC execution is denied", async () => {
+    const d = await newAiDeal();
+    for (const role of ["anon", "authenticated"]) {
+      await fails(`select * from negotiation_private.sessions limit 1`, /permission denied/, role);
+      await fails(`select fn_neg_seller_propose('${d.deal}','${d.seller}',600,24,'physical_goods','Tracked shipping','')`, /permission denied/, role);
+    }
+    await fails(`update deals set buyer_budget=100 where id='${d.deal}'`, /deals_buyer_budget_must_be_null/);
+  });
+
+  test("turn claims serialize and completed request IDs replay without a second offer", async () => {
+    const d = await newAiDeal();
+    const first = randomUUID(), second = randomUUID();
+    const [a, b] = await Promise.allSettled([
+      j(`select fn_neg_claim_turn('${d.deal}','${d.buyer}','${first}',30,50,12)::text`),
+      j(`select fn_neg_claim_turn('${d.deal}','${d.buyer}','${second}',30,50,12)::text`),
+    ]);
+    assert.equal([a,b].filter(x => x.status === "fulfilled").length, 1);
+    const claim = a.status === "fulfilled" ? a.value : b.value;
+    const requestId = a.status === "fulfilled" ? first : second;
+    const result = await j(`select fn_neg_commit_turn('${d.deal}','${d.buyer}','${requestId}','${claim.lease}',null,null,'buyer_agent','Buyer agent submitted an offer.',900)::text`);
+    const replay = await j(`select fn_neg_claim_turn('${d.deal}','${d.buyer}','${requestId}',30,50,12)::text`);
+    assert.deepEqual(replay, { kind: "replay", result });
+    assert.equal(await sql(`select turn_count from negotiation_private.sessions where deal_id='${d.deal}'`), "1");
   });
 });
 

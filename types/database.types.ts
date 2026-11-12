@@ -58,6 +58,14 @@ export type Database = {
           status: Database["public"]["Enums"]["deal_status"] | null
           terms_json: Json | null
           tracking_number: string | null
+          shipped_at: string | null
+          return_window_started_at: string | null
+          return_window_ends_at: string | null
+          delivery_confirmed_at: string | null
+          delivery_confirmed_by: string | null
+          delivery_note: string | null
+          needs_review: boolean
+          review_reason: string | null
         }
         Insert: {
           agreed_price?: number | null
@@ -75,6 +83,14 @@ export type Database = {
           status?: Database["public"]["Enums"]["deal_status"] | null
           terms_json?: Json | null
           tracking_number?: string | null
+          shipped_at?: string | null
+          return_window_started_at?: string | null
+          return_window_ends_at?: string | null
+          delivery_confirmed_at?: string | null
+          delivery_confirmed_by?: string | null
+          delivery_note?: string | null
+          needs_review?: boolean
+          review_reason?: string | null
         }
         Update: {
           agreed_price?: number | null
@@ -92,6 +108,14 @@ export type Database = {
           status?: Database["public"]["Enums"]["deal_status"] | null
           terms_json?: Json | null
           tracking_number?: string | null
+          shipped_at?: string | null
+          return_window_started_at?: string | null
+          return_window_ends_at?: string | null
+          delivery_confirmed_at?: string | null
+          delivery_confirmed_by?: string | null
+          delivery_note?: string | null
+          needs_review?: boolean
+          review_reason?: string | null
         }
         Relationships: [
           {
@@ -447,4 +471,3 @@ export const Constants = {
     },
   },
 } as const
-

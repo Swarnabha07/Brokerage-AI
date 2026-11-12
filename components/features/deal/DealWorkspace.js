@@ -25,6 +25,7 @@ import {
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { NegotiationPanel } from "@/components/features/deal/NegotiationPanel";
 
 const WORKFLOW_STAGES = [
   { from: 0, text: "Negotiation" },
@@ -134,6 +135,7 @@ export function DealWorkspace({
           schema: "public",
           table: "deals",
           filter: `id=eq.${deal.id}`,
+          select: ["id"],
         },
         refresh,
       )
@@ -240,6 +242,9 @@ export function DealWorkspace({
             <DealStepper status={status} />
           </GlassCard>
           <GlassCard hover={false} className="p-6 md:p-8">
+            {isLive && currentDeal.aiNegotiationEnabled && status === "negotiating" && (
+              <div className="mb-6"><NegotiationPanel deal={currentDeal} role={role} /></div>
+            )}
             {isLive && status !== "negotiating" ? (
               <LiveStagePanel
                 deal={currentDeal}

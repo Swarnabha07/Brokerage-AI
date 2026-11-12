@@ -23,7 +23,9 @@ const patchSchema = z
   .strict();
 
 const SAFE_SELECT = `
-  *,
+  id, listing_id, buyer_id, seller_id, status, agreed_price, platform_fee, buyer_conditions,
+  negotiation_mode, terms_json, tracking_number, created_at, shipped_at,
+  return_window_started_at, return_window_ends_at, delivery_confirmed_at, delivery_confirmed_by,
   listing:listings(id, seller_id, title, description, price, created_at),
   buyer:users!buyer_id(id, email, role),
   seller:users!seller_id(id, email, role)`;
