@@ -121,7 +121,7 @@ PayPal Checkout does not collect or verify shipping addresses or delivery. Physi
 
 <div align="center">
 
-<a href="https://youtu.be/YlMEGBsW2NQ">
+<a href="https://youtu.be/Pu1nYuch5ek">
 <img src="https://img.shields.io/badge/▶️_WATCH_THE_3--MINUTE_DEMO-FF0000?style=for-the-badge&logo=youtube&logoColor=white&labelColor=0A0A0F" height="50"/>
 </a>
 
