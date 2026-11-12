@@ -4,8 +4,8 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 
-const DEMO_EMAIL = "demo-buyer@example.com";
-const DEMO_PASSWORD = "DemoBuyer123!";
+const DEMO_EMAIL = "sb-jeyzw53798172@personal.example.com";
+const DEMO_PASSWORD = "|qWx.r7/";
 
 export function DemoCredentials({ compact = false }) {
   const [copied, setCopied] = useState("");
@@ -76,13 +76,4 @@ export function DemoCredentials({ compact = false }) {
           </button>
         </div>
       </div>
-
-      <a
-        href="/login"
-        className="mt-4 inline-flex text-sm font-medium underline underline-offset-4"
-      >
-        Go to login
-      </a>
-    </section>
-  );
 }
