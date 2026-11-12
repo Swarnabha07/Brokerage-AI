@@ -142,7 +142,7 @@ export function NegotiationPanel({ deal, role }) {
             />
           </label>
 
-          <Button disabled={busy}>
+          <Button type="submit" disabled={busy}>
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -212,7 +212,7 @@ export function NegotiationPanel({ deal, role }) {
                   className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2"
                 />
 
-                <Button disabled={busy} aria-label="Send message">
+                <Button type="submit" disabled={busy} aria-label="Send message">
                   {busy ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
