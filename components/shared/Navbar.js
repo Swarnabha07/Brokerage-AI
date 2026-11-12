@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Handshake, Menu, X, LogOut, LayoutDashboard } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard } from "lucide-react";
 import { APP_NAME, NAV_LINKS } from "@/lib/config";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,9 +17,14 @@ function Brand() {
       className="flex items-center gap-2"
       aria-label={`${APP_NAME} home`}
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-gradient text-white">
-        <Handshake className="h-4 w-4" aria-hidden="true" />
-      </span>
+      <Image
+        src="/logo.svg"
+        alt=""
+        width={32}
+        height={32}
+        className="h-8 w-8 rounded-lg"
+        priority
+      />
       <span className="font-display text-base font-semibold tracking-tight">
         Brokerage<span className="text-gradient">AI</span>
       </span>
