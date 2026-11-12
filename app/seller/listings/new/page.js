@@ -1,4 +1,4 @@
-
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -9,8 +9,28 @@ import { getVerifiedUser } from "@/lib/auth/server";
 
 export const metadata = { title: "New listing" };
 
-export default async function NewListingPage() {
-  // Prevent this authenticated page from being prerendered at build time.
+function LoadingFallback() {
+  return (
+    <div className="mx-auto max-w-2xl px-6 py-10">
+      <div className="animate-pulse space-y-4">
+        <div className="h-4 w-32 rounded bg-muted" />
+        <div className="h-8 w-64 rounded bg-muted" />
+        <div className="h-4 w-80 rounded bg-muted" />
+        <div className="h-64 rounded-xl bg-muted" />
+      </div>
+    </div>
+  );
+}
+
+export default function NewListingPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <SellerListingContent />
+    </Suspense>
+  );
+}
+
+async function SellerListingContent() {
   await connection();
 
   const user = await getVerifiedUser();
