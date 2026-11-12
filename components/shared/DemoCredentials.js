@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -15,7 +14,8 @@ export function DemoCredentials({ compact = false }) {
       await navigator.clipboard.writeText(value);
       setCopied(label);
       window.setTimeout(() => setCopied(""), 1500);
-    } catch {
+    } catch (error) {
+      console.error("Could not copy credentials:", error);
       setCopied("");
     }
   }
@@ -26,9 +26,12 @@ export function DemoCredentials({ compact = false }) {
         <h3 className="font-semibold">
           Demo Buyer Credentials
         </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Use these sample credentials to access the demo buyer account.
-        </p>
+
+        {!compact && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Use these credentials to access the demo buyer account.
+          </p>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -76,4 +79,6 @@ export function DemoCredentials({ compact = false }) {
           </button>
         </div>
       </div>
+    </section>
+  );
 }
