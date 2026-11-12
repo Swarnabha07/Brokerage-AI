@@ -9,7 +9,7 @@ import { AuthError, type AuthedUser } from "@/lib/auth/server";
 export async function loadDealForMember(dealId: string, user: AuthedUser) {
   const { data: deal, error } = await supabaseAdmin
     .from("deals")
-    .select("*, listing:listings(id, seller_id, title, description, price)")
+    .select("id,listing_id,buyer_id,seller_id,status,agreed_price,platform_fee,buyer_conditions,negotiation_mode,terms_json,tracking_number,created_at,shipped_at,return_window_started_at,return_window_ends_at,delivery_confirmed_at,delivery_confirmed_by,needs_review,review_reason,listing:listings(id,seller_id,title,description,price)")
     .eq("id", dealId)
     .maybeSingle();
 

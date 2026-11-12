@@ -21,7 +21,7 @@ export async function proposeTerms(user: AuthedUser, dealId: string, priceInput:
   const priceCents = parsePriceToCents(priceInput);
   if (priceCents === null || priceCents < cfg.minDealCents) throw new HttpError(400, 'invalid_price', 'Enter a valid final price');
   if (!deal.listing) throw new HttpError(409, 'listing_unavailable', 'The listing is unavailable');
-  return rpc('fn_propose_terms', {
+  const args = {
     p_deal_id: dealId,
     p_seller_id: user.id,
     p_price_cents: priceCents,
@@ -29,7 +29,13 @@ export async function proposeTerms(user: AuthedUser, dealId: string, priceInput:
     p_fulfillment_type: terms.fulfillmentType,
     p_delivery_expectations: terms.deliveryExpectations,
     p_transaction_conditions: terms.transactionConditions,
-  });
+  };
+  const session = await rpc<Record<string, unknown> | null>('fn_neg_public_state', { p_deal_id: dealId, p_user_id: user.id });
+  // AI sessions use a single explicit seller proposal/approval bridge. The existing public
+  // fn_propose_terms rejects direct AI-session calls; manual legacy deals keep that path.
+  return session
+    ? rpc('fn_neg_seller_propose', args)
+    : rpc('fn_propose_terms', args);
 }
 
 export async function acceptTerms(user: AuthedUser, dealId: string) {

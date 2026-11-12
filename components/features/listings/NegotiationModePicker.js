@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, MessageSquare, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export function NegotiationModePicker({ listingId, dealId }) {
   const [mode, setMode] = useState("ai_negotiate");
   const [isStarting, setIsStarting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const createRequest = useRef(null);
   const selected = MODES.find((m) => m.value === mode);
 
   async function handleStartDeal() {
@@ -38,13 +39,15 @@ export function NegotiationModePicker({ listingId, dealId }) {
 
     if (isUuid) {
       try {
+        const createPayload = { listing_id: listingId, negotiation_mode: mode };
+        const fingerprint = JSON.stringify(createPayload);
+        if (createRequest.current?.fingerprint !== fingerprint) {
+          createRequest.current = { fingerprint, id: crypto.randomUUID() };
+        }
         const res = await fetch("/api/deals", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            listing_id: listingId,
-            negotiation_mode: mode,
-          }),
+          headers: { "Content-Type": "application/json", "Idempotency-Key": createRequest.current.id },
+          body: JSON.stringify(createPayload),
         });
 
         const data = await res.json().catch(() => ({}));
@@ -53,6 +56,7 @@ export function NegotiationModePicker({ listingId, dealId }) {
           return;
         }
         if (res.ok && data?.id) {
+          createRequest.current = null;
           router.push(`/deal/${data.id}`);
           return;
         }

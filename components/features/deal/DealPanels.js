@@ -113,7 +113,7 @@ export function StagePanel({
         </ul>
         {isLive ? (
           <div className="space-y-4">
-            {role === "seller" && (
+            {role === "seller" && !(deal.aiNegotiationEnabled && ["setup_pending", "approved", "accepted", "expired", "cancelled"].includes(deal.aiNegotiationState)) && (
               <div className="space-y-2">
                 <label className="block text-sm" htmlFor="mutual-final-price">Final price (USD)</label>
                 <input id="mutual-final-price" className="w-full rounded-lg border border-border bg-background px-3 py-2" inputMode="decimal" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} />
@@ -128,7 +128,7 @@ export function StagePanel({
                 <textarea id="delivery-expectations" className="w-full rounded-lg border border-border bg-background px-3 py-2" rows={3} maxLength={2000} value={deliveryExpectations} onChange={(e) => setDeliveryExpectations(e.target.value)} placeholder="For example: tracked shipping, local pickup, or the service deliverable and due date" />
                 <label className="block text-sm" htmlFor="transaction-conditions">Other transaction conditions (optional)</label>
                 <textarea id="transaction-conditions" className="w-full rounded-lg border border-border bg-background px-3 py-2" rows={2} maxLength={2000} value={transactionConditions} onChange={(e) => setTransactionConditions(e.target.value)} />
-                <Button onClick={() => onProposeTerms(finalPrice, { fulfillmentType, deliveryExpectations, transactionConditions })} disabled={isPending || !fulfillmentType || deliveryExpectations.trim().length < 3}>{deal.agreement ? "Update terms (resets both acceptances)" : "Propose terms"}</Button>
+                <Button onClick={() => onProposeTerms(finalPrice, { fulfillmentType, deliveryExpectations, transactionConditions })} disabled={isPending || !fulfillmentType || deliveryExpectations.trim().length < 3}>{deal.aiNegotiationEnabled ? "Approve and propose binding terms" : deal.agreement ? "Update terms (resets both acceptances)" : "Propose terms"}</Button>
               </div>
             )}
             {deal.agreement ? (
@@ -144,7 +144,7 @@ export function StagePanel({
                 <p>Return window: {deal.agreement.terms?.return_window_hours} hours</p>
                 <p className="text-muted-foreground">{deal.agreement.terms?.return_window_policy}</p>
                 <p>Accepted: buyer {deal.agreement.buyerAccepted ? "✓" : "—"}; seller {deal.agreement.sellerAccepted ? "✓" : "—"}</p>
-                <Button onClick={onAcceptTerms} disabled={isPending}>{deal.agreement[`${role}Accepted`] ? "Accepted current terms" : "Accept these terms"}</Button>
+                <Button onClick={onAcceptTerms} disabled={isPending || deal.agreement[`${role}Accepted`]}>{deal.agreement[`${role}Accepted`] ? "Accepted current terms" : "Accept these terms"}</Button>
               </div>
             ) : <Waiting>Seller must propose the final price and transaction terms first.</Waiting>}
           </div>
