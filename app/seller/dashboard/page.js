@@ -72,9 +72,14 @@ export default async function SellerDashboardPage() {
           </>
         }
         action={
-          <Link href="/seller/listings/new" className={buttonVariants({})}>
-            <Plus className="h-4 w-4" aria-hidden="true" /> New listing
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/analytics" className={buttonVariants({ variant: "outline" })}>
+              Transaction intelligence
+            </Link>
+            <Link href="/seller/listings/new" className={buttonVariants({})}>
+              <Plus className="h-4 w-4" aria-hidden="true" /> New listing
+            </Link>
+          </div>
         }
       />
 
