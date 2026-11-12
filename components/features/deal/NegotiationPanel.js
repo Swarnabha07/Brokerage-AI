@@ -124,7 +124,7 @@ export function NegotiationPanel({ deal, role }) {
         the other participant or to Google Gemini.
       </p>
 
-      {!state && role === "buyer" && (
+      {(!state || state.status === "setup_pending") && role === "buyer" && (
         <form
           ref={formRef}
           onSubmit={start}
@@ -142,7 +142,7 @@ export function NegotiationPanel({ deal, role }) {
             />
           </label>
 
-          <Button disabled={busy}>
+          <Button type="submit" disabled={busy}>
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -152,13 +152,13 @@ export function NegotiationPanel({ deal, role }) {
         </form>
       )}
 
-      {!state && role !== "buyer" && (
+      {(!state || state.status === "setup_pending") && role !== "buyer" && (
         <p className="text-sm text-muted-foreground">
           The buyer has not started negotiation.
         </p>
       )}
 
-      {state && (
+      {state && state.status !== "setup_pending" && (
         <>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="rounded-full bg-muted px-3 py-1">
@@ -212,7 +212,7 @@ export function NegotiationPanel({ deal, role }) {
                   className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2"
                 />
 
-                <Button disabled={busy} aria-label="Send message">
+                <Button type="submit" disabled={busy} aria-label="Send message">
                   {busy ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (

@@ -1,16 +1,23 @@
 import { Suspense } from "react";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+
 import "./globals.css";
+
 import { Navbar, NavbarFallback } from "@/components/shared/Navbar";
 import { DemoBanner } from "@/components/shared/DemoBanner";
 import { Footer } from "@/components/shared/Footer";
 import { MotionProvider } from "@/components/shared/MotionProvider";
 
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
+
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
@@ -41,14 +48,18 @@ export default function RootLayout({ children }) {
         >
           Skip to content
         </a>
+
         <MotionProvider>
           <Suspense fallback={<NavbarFallback />}>
             <Navbar />
           </Suspense>
+
           <DemoBanner />
+
           <main id="main" className="flex-1">
             {children}
           </main>
+
           <Footer />
         </MotionProvider>
       </body>
