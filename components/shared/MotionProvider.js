@@ -2,7 +2,14 @@
 
 import { MotionConfig } from "framer-motion";
 
-/** Makes every Framer Motion animation respect the visitor's reduced-motion setting. */
+/**
+ * Preserve Framer Motion throughout the application
+ * while respecting the visitor's reduced-motion preference.
+ */
 export function MotionProvider({ children }) {
-  return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
+  return (
+    <MotionConfig reducedMotion="user">
+      {children}
+    </MotionConfig>
+  );
 }
