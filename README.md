@@ -217,6 +217,13 @@ PayPal Checkout does not collect or verify shipping addresses or delivery. Physi
 <br>
 
 ## 🏗️ Architecture
+
+### Transaction Intelligence — AG Studio
+
+Brokerage AI includes a role-specific, read-only analytics workspace at `/analytics`, powered by AG Studio 3.1.0 (AG Grid and AG Charts). Buyers can explore verified captured purchase activity, return-window funds, lifecycle distribution and searchable transaction history. Sellers can explore deal pipeline, listing performance and recorded payout statuses. Dashboards include a Brokerage AI Deal Health Overview widget and are editable with drag, resize and cross-filter controls.
+
+Analytics is built from owner-scoped server-side reads and sends only sanitized rows to AG Studio. Payment totals require captured payment records; seller payout totals use actual payout records. No database changes are required. A trial key is optional for local use; set `NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY` in the environment for a licensed deployment. See [`docs/AG_STUDIO_ANALYTICS.md`](docs/AG_STUDIO_ANALYTICS.md).
+
 ### System Layers
 
 <img width="900" height="610" alt="Neon AI Marketplace Architecture Flow" src="https://github.com/user-attachments/assets/cb151053-8dd1-412c-a0bb-e5732f8ac947" />

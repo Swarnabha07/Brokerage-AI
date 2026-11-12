@@ -50,9 +50,14 @@ export default async function BuyerDashboardPage() {
           </>
         }
         action={
-          <Link href="/listings" className={buttonVariants({})}>
-            <Search className="h-4 w-4" aria-hidden="true" /> Browse listings
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/analytics" className={buttonVariants({ variant: "outline" })}>
+              Transaction intelligence
+            </Link>
+            <Link href="/listings" className={buttonVariants({})}>
+              <Search className="h-4 w-4" aria-hidden="true" /> Browse listings
+            </Link>
+          </div>
         }
       />
 
