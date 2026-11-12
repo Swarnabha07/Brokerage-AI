@@ -1,30 +1,43 @@
+
 import Link from "next/link";
 import { Clock, Search, ShoppingBag, Wallet } from "lucide-react";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
+
 import { PageHeader } from "@/components/features/dashboard/PageHeader";
 import { StatCard } from "@/components/features/dashboard/StatCard";
 import { DealCard } from "@/components/features/dashboard/DealCard";
 import { TransactionsTable } from "@/components/features/dashboard/TransactionsTable";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { GlassCard } from "@/components/shared/GlassCard";
+import { DemoCredentials } from "@/components/shared/DemoCredentials";
 import { buttonVariants } from "@/components/ui/button";
+
 import { getBuyerDashboard } from "@/lib/api/deals";
-import { redirect } from "next/navigation";
 import { getVerifiedUser } from "@/lib/auth/server";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { FEE_RATE_LABEL } from "@/lib/fees";
-import { connection } from "next/server";
+
 export const metadata = { title: "Buyer dashboard" };
 
 export default async function BuyerDashboardPage() {
   await connection();
+
   const user = await getVerifiedUser();
+
   if (!user) redirect("/login");
   if (user.role !== "buyer") redirect("/seller/dashboard");
-  const { viewer, stats, activeDeals, history } = await getBuyerDashboard(user);
+
+  const { viewer, stats, activeDeals, history } =
+    await getBuyerDashboard(user);
 
   const columns = [
     { key: "title", header: "Item" },
-    { key: "date", header: "Date", render: (r) => formatDate(r.date) },
+    {
+      key: "date",
+      header: "Date",
+      render: (r) => formatDate(r.date),
+    },
     {
       key: "fee",
       header: `Platform fee (${FEE_RATE_LABEL}, provisional)`,
@@ -43,18 +56,19 @@ export default async function BuyerDashboardPage() {
     <div className="mx-auto max-w-7xl px-6 py-10">
       <PageHeader
         title="Buyer dashboard"
-        description={
-          <>
-            {`Signed in as ${viewer.name}. `}
-
-          </>
-        }
+        description={`Signed in as ${viewer.name}.`}
         action={
           <Link href="/listings" className={buttonVariants({})}>
-            <Search className="h-4 w-4" aria-hidden="true" /> Browse listings
+            <Search className="h-4 w-4" aria-hidden="true" />
+            Browse listings
           </Link>
         }
       />
+
+      {/* Demo login credentials */}
+      <div className="mb-8 max-w-2xl">
+        <DemoCredentials />
+      </div>
 
       <div className="mb-10 grid gap-5 sm:grid-cols-3">
         <StatCard
@@ -63,12 +77,14 @@ export default async function BuyerDashboardPage() {
           value={stats.activeDeals}
           currency={false}
         />
+
         <StatCard
           icon={Clock}
           label="In return window"
           value={stats.inReturnWindowTotal}
           delay={0.08}
         />
+
         <StatCard
           icon={Wallet}
           label="Spent on completed deals"
@@ -84,6 +100,7 @@ export default async function BuyerDashboardPage() {
         >
           Active deals
         </h2>
+
         {activeDeals.length === 0 ? (
           <GlassCard hover={false}>
             <EmptyState
@@ -106,9 +123,13 @@ export default async function BuyerDashboardPage() {
       </section>
 
       <section aria-labelledby="history">
-        <h2 id="history" className="mb-5 font-display text-lg font-semibold">
+        <h2
+          id="history"
+          className="mb-5 font-display text-lg font-semibold"
+        >
           Order history
         </h2>
+
         <TransactionsTable
           caption="Completed orders"
           columns={columns}
