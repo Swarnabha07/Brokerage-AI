@@ -10,6 +10,7 @@ import { getVerifiedUser } from "@/lib/auth/server";
 export const metadata = { title: "New listing" };
 
 export default async function NewListingPage() {
+  // Prevent this authenticated page from being prerendered at build time.
   await connection();
 
   const user = await getVerifiedUser();
